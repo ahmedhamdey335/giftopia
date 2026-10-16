@@ -2,11 +2,20 @@
 
 use App\Http\Controllers\Admin\CatalogController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\StudioController;
 use App\Support\CatalogRegistry;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+
+Route::prefix('studio')->name('studio.')->middleware('throttle:30,1')->group(function () {
+    Route::get('/catalog', [StudioController::class, 'catalog'])->name('catalog');
+    Route::post('/validate', [StudioController::class, 'validateConfiguration'])->name('validate');
+    Route::post('/quote', [StudioController::class, 'quote'])
+        ->middleware('optional-auth')
+        ->name('quote');
+});
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

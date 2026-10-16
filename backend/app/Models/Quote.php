@@ -14,11 +14,14 @@ class Quote extends Model
 
     protected $fillable = [
         'base_item_id',
+        'user_id',
         'configuration',
+        'config_hash',
         'price_breakdown',
         'total_price',
         'ready_at',
         'expires_at',
+        'used_at',
     ];
 
     protected function casts(): array
@@ -29,12 +32,18 @@ class Quote extends Model
             'total_price' => 'integer',
             'ready_at' => 'datetime',
             'expires_at' => 'datetime',
+            'used_at' => 'datetime',
         ];
     }
 
     public function baseItem(): BelongsTo
     {
         return $this->belongsTo(BaseItem::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function isExpired(): bool

@@ -16,6 +16,7 @@ class QuoteFactory extends Factory
         return [
             'base_item_id' => BaseItem::factory(),
             'configuration' => [],
+            'config_hash' => hash('sha256', '{}'),
             'price_breakdown' => [],
             'total_price' => 10000,
             'ready_at' => now()->addDays(3),

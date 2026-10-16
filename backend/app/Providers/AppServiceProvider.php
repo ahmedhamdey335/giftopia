@@ -11,6 +11,8 @@ use App\Models\Mood;
 use App\Models\Technique;
 use App\Models\TextColor;
 use App\Models\User;
+use App\Services\Studio\LeadTimeEstimator;
+use App\Services\Studio\WorkingDayLeadTimeEstimator;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(LeadTimeEstimator::class, WorkingDayLeadTimeEstimator::class);
     }
 
     public function boot(): void

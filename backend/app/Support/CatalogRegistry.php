@@ -42,7 +42,7 @@ final class CatalogRegistry
                 'name' => ['string', 'max:255'],
                 'size_label' => ['string', 'max:255'],
                 'depth_mm' => ['numeric', 'min:0'],
-                'price_delta' => ['integer'],
+                'price_delta' => ['integer', 'min:0'],
             ],
         ],
         'moods' => [
@@ -61,7 +61,7 @@ final class CatalogRegistry
                 'name' => ['string', 'max:255'],
                 'hex' => ['string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
                 'role' => ['in:base,accent'],
-                'price_delta' => ['integer'],
+                'price_delta' => ['integer', 'min:0'],
                 'is_available' => ['boolean'],
             ],
         ],
@@ -70,7 +70,7 @@ final class CatalogRegistry
             'availability' => null,
             'rules' => [
                 'name' => ['string', 'max:255'],
-                'price_delta' => ['integer'],
+                'price_delta' => ['integer', 'min:0'],
                 'labor_minutes' => ['integer', 'min:0'],
                 'requires_accent' => ['boolean'],
             ],
@@ -93,7 +93,7 @@ final class CatalogRegistry
             'availability' => null,
             'rules' => [
                 'name' => ['string', 'max:255'],
-                'price_delta' => ['integer'],
+                'price_delta' => ['integer', 'min:0'],
             ],
         ],
         'text-colors' => [
@@ -101,7 +101,7 @@ final class CatalogRegistry
             'availability' => null,
             'rules' => [
                 'name' => ['string', 'max:255'],
-                'price_delta' => ['integer'],
+                'price_delta' => ['integer', 'min:0'],
             ],
         ],
         'option-rules' => [

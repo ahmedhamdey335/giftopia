@@ -29,6 +29,7 @@ final class StudioConfiguration
         public readonly ?Font $font,
         public readonly ?TextColor $textColor,
         public readonly ?string $personalizationText,
+        public readonly ?string $personalizationNote,
         public readonly array $unknown = [],
     ) {}
 
@@ -45,6 +46,9 @@ final class StudioConfiguration
 
         $text = isset($input['personalization_text'])
             ? trim((string) $input['personalization_text'])
+            : null;
+        $note = isset($input['personalization_note']) || isset($input['note'])
+            ? trim((string) ($input['personalization_note'] ?? $input['note']))
             : null;
 
         $unknown = [];
@@ -75,6 +79,7 @@ final class StudioConfiguration
             font: $font,
             textColor: $textColor,
             personalizationText: $text === '' ? null : $text,
+            personalizationNote: $note === '' ? null : $note,
             unknown: $unknown,
         );
     }
@@ -148,58 +153,6 @@ final class StudioConfiguration
         return $this->personalizationText !== null && $this->personalizationText !== '';
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function toSnapshot(): array
-    {
-        return [
-            'base_item' => $this->baseItem ? [
-                'id' => $this->baseItem->id,
-                'name' => $this->baseItem->name,
-                'slug' => $this->baseItem->slug,
-            ] : null,
-            'mold' => $this->mold ? [
-                'id' => $this->mold->id,
-                'name' => $this->mold->name,
-                'size_label' => $this->mold->size_label,
-                'depth_mm' => $this->mold->depth_mm,
-            ] : null,
-            'mood' => $this->mood ? [
-                'id' => $this->mood->id,
-                'name' => $this->mood->name,
-            ] : null,
-            'technique' => $this->technique ? [
-                'id' => $this->technique->id,
-                'name' => $this->technique->name,
-            ] : null,
-            'base_color' => $this->baseColor ? [
-                'id' => $this->baseColor->id,
-                'name' => $this->baseColor->name,
-                'hex' => $this->baseColor->hex,
-            ] : null,
-            'accent_color' => $this->accentColor ? [
-                'id' => $this->accentColor->id,
-                'name' => $this->accentColor->name,
-                'hex' => $this->accentColor->hex,
-            ] : null,
-            'inserts' => $this->inserts->map(fn (Insert $insert) => [
-                'id' => $insert->id,
-                'name' => $insert->name,
-                'type' => $insert->type->value,
-            ])->values()->all(),
-            'font' => $this->font ? [
-                'id' => $this->font->id,
-                'name' => $this->font->name,
-            ] : null,
-            'text_color' => $this->textColor ? [
-                'id' => $this->textColor->id,
-                'name' => $this->textColor->name,
-            ] : null,
-            'personalization_text' => $this->personalizationText,
-        ];
-    }
-
     public function totalLaborMinutes(): int
     {
         $minutes = (int) ($this->baseItem?->labor_minutes ?? 0);
@@ -207,6 +160,26 @@ final class StudioConfiguration
         $minutes += (int) $this->inserts->sum('labor_minutes');
 
         return $minutes;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function normalizedConfiguration(): array
+    {
+        return [
+            'base_item_id' => $this->baseItem?->id,
+            'mold_id' => $this->mold?->id,
+            'mood_id' => $this->mood?->id,
+            'technique_id' => $this->technique?->id,
+            'base_color_id' => $this->baseColor?->id,
+            'accent_color_id' => $this->accentColor?->id,
+            'insert_ids' => $this->inserts->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all(),
+            'font_id' => $this->font?->id,
+            'text_color_id' => $this->textColor?->id,
+            'personalization_text' => $this->personalizationText,
+            'personalization_note' => $this->personalizationNote,
+        ];
     }
 
     public function cureHours(): int
