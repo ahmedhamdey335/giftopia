@@ -30,6 +30,28 @@ services:
       - giftopia
     restart: unless-stopped
 
+  queue:
+    image: giftopia-app
+    working_dir: /var/www/html
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90", "--sleep=3"]
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-giftopia}
+      DB_USERNAME: ${DB_USERNAME:-giftopia}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - giftopia
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.25-alpine
     ports:
