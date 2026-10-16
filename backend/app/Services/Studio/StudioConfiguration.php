@@ -7,6 +7,7 @@ use App\Models\ColorSwatch;
 use App\Models\Font;
 use App\Models\Insert;
 use App\Models\Mold;
+use App\Models\Mood;
 use App\Models\Technique;
 use App\Models\TextColor;
 use Illuminate\Support\Collection;
@@ -15,10 +16,12 @@ final class StudioConfiguration
 {
     /**
      * @param  Collection<int, Insert>  $inserts
+     * @param  list<array{field: string, id: mixed}>  $unknown
      */
     public function __construct(
         public readonly ?BaseItem $baseItem,
         public readonly ?Mold $mold,
+        public readonly ?Mood $mood,
         public readonly ?Technique $technique,
         public readonly ?ColorSwatch $baseColor,
         public readonly ?ColorSwatch $accentColor,
@@ -26,6 +29,7 @@ final class StudioConfiguration
         public readonly ?Font $font,
         public readonly ?TextColor $textColor,
         public readonly ?string $personalizationText,
+        public readonly array $unknown = [],
     ) {}
 
     /**
@@ -43,19 +47,54 @@ final class StudioConfiguration
             ? trim((string) $input['personalization_text'])
             : null;
 
+        $unknown = [];
+        $baseItem = self::find(BaseItem::class, $input, 'base_item_id', $unknown);
+        $mold = self::find(Mold::class, $input, 'mold_id', $unknown);
+        $mood = self::find(Mood::class, $input, 'mood_id', $unknown);
+        $technique = self::find(Technique::class, $input, 'technique_id', $unknown);
+        $baseColor = self::find(ColorSwatch::class, $input, 'base_color_id', $unknown);
+        $accentColor = self::find(ColorSwatch::class, $input, 'accent_color_id', $unknown);
+        $font = self::find(Font::class, $input, 'font_id', $unknown);
+        $textColor = self::find(TextColor::class, $input, 'text_color_id', $unknown);
+
+        $inserts = $insertIds->isEmpty()
+            ? collect()
+            : Insert::query()->whereIn('id', $insertIds)->get();
+        foreach ($insertIds->diff($inserts->pluck('id')) as $id) {
+            $unknown[] = ['field' => 'insert_ids', 'id' => $id];
+        }
+
         return new self(
-            baseItem: isset($input['base_item_id']) ? BaseItem::query()->find($input['base_item_id']) : null,
-            mold: isset($input['mold_id']) ? Mold::query()->find($input['mold_id']) : null,
-            technique: isset($input['technique_id']) ? Technique::query()->find($input['technique_id']) : null,
-            baseColor: isset($input['base_color_id']) ? ColorSwatch::query()->find($input['base_color_id']) : null,
-            accentColor: isset($input['accent_color_id']) ? ColorSwatch::query()->find($input['accent_color_id']) : null,
-            inserts: $insertIds->isEmpty()
-                ? collect()
-                : Insert::query()->whereIn('id', $insertIds)->get(),
-            font: isset($input['font_id']) ? Font::query()->find($input['font_id']) : null,
-            textColor: isset($input['text_color_id']) ? TextColor::query()->find($input['text_color_id']) : null,
+            baseItem: $baseItem,
+            mold: $mold,
+            mood: $mood,
+            technique: $technique,
+            baseColor: $baseColor,
+            accentColor: $accentColor,
+            inserts: $inserts,
+            font: $font,
+            textColor: $textColor,
             personalizationText: $text === '' ? null : $text,
+            unknown: $unknown,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @param  list<array{field: string, id: mixed}>  $unknown
+     */
+    private static function find(string $model, array $input, string $field, array &$unknown): ?object
+    {
+        if (! isset($input[$field]) || $input[$field] === '') {
+            return null;
+        }
+
+        $option = $model::query()->find($input[$field]);
+        if ($option === null) {
+            $unknown[] = ['field' => $field, 'id' => $input[$field]];
+        }
+
+        return $option;
     }
 
     /**
@@ -71,6 +110,10 @@ final class StudioConfiguration
 
         if ($this->mold) {
             $options[] = ['type' => 'mold', 'id' => $this->mold->id];
+        }
+
+        if ($this->mood) {
+            $options[] = ['type' => 'mood', 'id' => $this->mood->id];
         }
 
         if ($this->technique) {
@@ -121,6 +164,10 @@ final class StudioConfiguration
                 'name' => $this->mold->name,
                 'size_label' => $this->mold->size_label,
                 'depth_mm' => $this->mold->depth_mm,
+            ] : null,
+            'mood' => $this->mood ? [
+                'id' => $this->mood->id,
+                'name' => $this->mood->name,
             ] : null,
             'technique' => $this->technique ? [
                 'id' => $this->technique->id,

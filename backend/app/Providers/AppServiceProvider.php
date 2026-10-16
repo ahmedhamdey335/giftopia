@@ -10,6 +10,7 @@ use App\Models\Mold;
 use App\Models\Mood;
 use App\Models\Technique;
 use App\Models\TextColor;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
             'insert' => Insert::class,
             'font' => Font::class,
             'text_color' => TextColor::class,
+            'user' => User::class,
         ]);
     }
 }

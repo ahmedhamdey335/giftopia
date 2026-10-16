@@ -23,6 +23,23 @@ class CompatibilityValidator
 
         $this->appendStructuralIssues($config, $strict, $violations, $warnings);
 
+        foreach ($config->unknown as $unknown) {
+            $type = match ($unknown['field']) {
+                'base_item_id' => 'base_item',
+                'mold_id' => 'mold',
+                'mood_id' => 'mood',
+                'technique_id' => 'technique',
+                'base_color_id', 'accent_color_id' => 'color_swatch',
+                'font_id' => 'font',
+                'text_color_id' => 'text_color',
+                'insert_ids' => 'insert',
+                default => 'option',
+            };
+
+            $label = str_replace('_', ' ', $type);
+            $violations[] = $this->structural($type, is_numeric($unknown['id']) ? (int) $unknown['id'] : null, 'Unknown '.$label.'.');
+        }
+
         foreach (OptionRule::query()->get() as $rule) {
             $subjectKey = $rule->subject_type.':'.$rule->subject_id;
             $target = [
@@ -111,8 +128,28 @@ class CompatibilityValidator
             $violations[] = $this->structural('base_item', $config->baseItem->id, 'This item is not currently offered.');
         }
 
+        if ($config->mood && $config->mood->is_active === false) {
+            $violations[] = $this->structural('mood', $config->mood->id, 'That mood is not currently offered.');
+        }
+
         if ($strict && $config->baseItem === null) {
             $violations[] = $this->structural('base_item', null, 'Choose an item to quote.');
+        }
+
+        if ($strict && $config->mold === null) {
+            $violations[] = $this->structural('mold', null, 'Choose a mold.');
+        }
+
+        if ($strict && $config->mood === null) {
+            $violations[] = $this->structural('mood', null, 'Choose a mood.');
+        }
+
+        if ($strict && $config->technique === null) {
+            $violations[] = $this->structural('technique', null, 'Choose a technique.');
+        }
+
+        if ($strict && $config->baseColor === null) {
+            $violations[] = $this->structural('color_swatch', null, 'Choose a base color.');
         }
 
         if ($config->mold && $config->baseItem && $config->mold->base_item_id !== $config->baseItem->id) {

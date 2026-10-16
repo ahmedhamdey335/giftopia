@@ -20,386 +20,166 @@ class CatalogSeeder extends Seeder
 {
     public function run(): void
     {
-        $coasters = BaseItem::query()->create([
-            'name' => 'Round Coaster Set',
-            'slug' => 'round-coaster-set',
-            'base_price' => 28000,
-            'piece_count' => 4,
-            'labor_minutes' => 45,
-            'cure_hours' => 24,
-            'max_text_chars' => 18,
-            'is_active' => true,
-        ]);
+        $items = [];
+        foreach ([
+            ['Round Coaster Set', 'round-coaster-set', 28000, 4, 45, 24, 18],
+            ['Resin Bookmark Pair', 'resin-bookmark-pair', 16000, 2, 30, 18, 24],
+            ['Serving Tray', 'serving-tray', 95000, 1, 90, 48, 32],
+            ['Letter Keychain', 'letter-keychain', 9000, 1, 20, 12, 1],
+        ] as [$name, $slug, $price, $pieces, $labor, $cure, $maxText]) {
+            $items[$slug] = BaseItem::query()->updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $name,
+                    'base_price' => $price,
+                    'piece_count' => $pieces,
+                    'labor_minutes' => $labor,
+                    'cure_hours' => $cure,
+                    'max_text_chars' => $maxText,
+                    'is_active' => true,
+                ],
+            );
+        }
 
-        $bookmarks = BaseItem::query()->create([
-            'name' => 'Resin Bookmark Pair',
-            'slug' => 'resin-bookmark-pair',
-            'base_price' => 16000,
-            'piece_count' => 2,
-            'labor_minutes' => 30,
-            'cure_hours' => 18,
-            'max_text_chars' => 24,
-            'is_active' => true,
-        ]);
+        $molds = [];
+        foreach ([
+            ['round-coaster-set', 'Classic Round', '9 cm', 8, 0],
+            ['round-coaster-set', 'Deep Round', '10 cm', 12, 4000],
+            ['resin-bookmark-pair', 'Slim Rectangle', '14 x 3 cm', 4, 0],
+            ['resin-bookmark-pair', 'Wide Rectangle', '14 x 4.5 cm', 5.5, 2000],
+            ['serving-tray', 'Oval Serving', '30 x 20 cm', 14, 0],
+            ['serving-tray', 'Deep Rectangle', '32 x 22 cm', 18, 12000],
+            ['letter-keychain', 'Circle Charm', '4 cm', 6, 0],
+        ] as [$itemSlug, $name, $size, $depth, $price]) {
+            $molds[$name] = Mold::query()->updateOrCreate(
+                ['base_item_id' => $items[$itemSlug]->id, 'name' => $name],
+                ['size_label' => $size, 'depth_mm' => $depth, 'price_delta' => $price],
+            );
+        }
 
-        $tray = BaseItem::query()->create([
-            'name' => 'Serving Tray',
-            'slug' => 'serving-tray',
-            'base_price' => 95000,
-            'piece_count' => 1,
-            'labor_minutes' => 90,
-            'cure_hours' => 48,
-            'max_text_chars' => 32,
-            'is_active' => true,
-        ]);
+        $swatches = [];
+        foreach ([
+            ['Pearl White', '#F6F1EA', ColorSwatchRole::Base, 0],
+            ['Ocean Teal', '#1B6B6B', ColorSwatchRole::Base, 500],
+            ['Blush Pink', '#E8A0BF', ColorSwatchRole::Base, 500],
+            ['Sage Green', '#9CAF88', ColorSwatchRole::Base, 500],
+            ['Charcoal Smoke', '#3A3A3A', ColorSwatchRole::Base, 0],
+            ['Metallic Gold', '#C9A227', ColorSwatchRole::Accent, 1500],
+            ['Copper Leaf', '#B87333', ColorSwatchRole::Accent, 1500],
+            ['Silver Mist', '#C0C6CE', ColorSwatchRole::Accent, 1000],
+        ] as [$name, $hex, $role, $price]) {
+            $swatches[$name] = ColorSwatch::query()->updateOrCreate(
+                ['name' => $name, 'role' => $role],
+                ['hex' => $hex, 'price_delta' => $price, 'is_available' => true],
+            );
+        }
 
-        $keychain = BaseItem::query()->create([
-            'name' => 'Letter Keychain',
-            'slug' => 'letter-keychain',
-            'base_price' => 9000,
-            'piece_count' => 1,
-            'labor_minutes' => 20,
-            'cure_hours' => 12,
-            'max_text_chars' => 1,
-            'is_active' => true,
-        ]);
+        $techniques = [];
+        foreach ([
+            ['Solid', 0, 0, false],
+            ['Gradient', 2500, 15, true],
+            ['Marble', 3500, 20, true],
+            ['Tint', 1500, 8, false],
+        ] as [$name, $price, $labor, $requiresAccent]) {
+            $techniques[$name] = Technique::query()->updateOrCreate(
+                ['name' => $name],
+                ['price_delta' => $price, 'labor_minutes' => $labor, 'requires_accent' => $requiresAccent],
+            );
+        }
 
-        $coasterStandard = Mold::query()->create([
-            'base_item_id' => $coasters->id,
-            'name' => 'Classic Round',
-            'size_label' => '9 cm',
-            'depth_mm' => 8.00,
-            'price_delta' => 0,
-        ]);
+        $inserts = [];
+        foreach ([
+            ['Dried Lavender', InsertType::Flower, 'purple', 3500, 12, 8],
+            ["Baby's Breath", InsertType::Flower, 'white', 3000, 10, 7],
+            ['Gold Foil Flakes', InsertType::Foil, 'gold', 2000, 6, 4],
+            ['Crushed Shell Mix', InsertType::Shell, 'iridescent', 2500, 8, 6],
+            ['Fine Rose Gold Glitter', InsertType::Glitter, 'rose gold', 1500, 5, 3],
+        ] as [$name, $type, $color, $price, $labor, $minDepth]) {
+            $inserts[$name] = Insert::query()->updateOrCreate(
+                ['name' => $name],
+                [
+                    'type' => $type,
+                    'color' => $color,
+                    'price' => $price,
+                    'labor_minutes' => $labor,
+                    'min_depth_mm' => $minDepth,
+                    'is_available' => true,
+                ],
+            );
+        }
 
-        $coasterDeep = Mold::query()->create([
-            'base_item_id' => $coasters->id,
-            'name' => 'Deep Round',
-            'size_label' => '10 cm',
-            'depth_mm' => 12.00,
-            'price_delta' => 4000,
-        ]);
+        $fonts = [];
+        foreach ([['Script Flourish', 1500], ['Modern Sans', 0], ['Classic Serif', 500]] as [$name, $price]) {
+            $fonts[$name] = Font::query()->updateOrCreate(['name' => $name], ['price_delta' => $price]);
+        }
 
-        $bookmarkSlim = Mold::query()->create([
-            'base_item_id' => $bookmarks->id,
-            'name' => 'Slim Rectangle',
-            'size_label' => '14 x 3 cm',
-            'depth_mm' => 4.00,
-            'price_delta' => 0,
-        ]);
+        $textColors = [];
+        foreach ([['Gold Leaf', 1000], ['Pearl White', 0], ['Ink Black', 0], ['Silver', 800]] as [$name, $price]) {
+            $textColors[$name] = TextColor::query()->updateOrCreate(['name' => $name], ['price_delta' => $price]);
+        }
 
-        Mold::query()->create([
-            'base_item_id' => $bookmarks->id,
-            'name' => 'Wide Rectangle',
-            'size_label' => '14 x 4.5 cm',
-            'depth_mm' => 5.50,
-            'price_delta' => 2000,
-        ]);
+        $legacyMoodNames = [
+            'Coastal Calm' => 'Summer/Cheerful',
+            'Blush Garden' => 'Romantic Pastel',
+            'Quiet Pearl' => 'Minimalist/Clean',
+        ];
+        foreach ($legacyMoodNames as $old => $new) {
+            $legacy = Mood::query()->where('name', $old)->first();
+            if (! $legacy) {
+                continue;
+            }
 
-        Mold::query()->create([
-            'base_item_id' => $tray->id,
-            'name' => 'Oval Serving',
-            'size_label' => '30 x 20 cm',
-            'depth_mm' => 14.00,
-            'price_delta' => 0,
-        ]);
+            $canonical = Mood::query()->where('name', $new)->where('id', '!=', $legacy->id)->exists();
+            $legacy->update($canonical
+                ? ['is_active' => false]
+                : ['name' => $new, 'is_active' => true]);
+        }
 
-        $trayDeep = Mold::query()->create([
-            'base_item_id' => $tray->id,
-            'name' => 'Deep Rectangle',
-            'size_label' => '32 x 22 cm',
-            'depth_mm' => 18.00,
-            'price_delta' => 12000,
-        ]);
+        $moods = [];
+        foreach ([
+            ['Summer/Cheerful', 'Gradient', 'Ocean Teal', 'Silver Mist', 'Gold Foil Flakes'],
+            ['Moody/Deep', 'Marble', 'Charcoal Smoke', 'Copper Leaf', 'Crushed Shell Mix'],
+            ['Romantic Pastel', 'Marble', 'Blush Pink', 'Metallic Gold', 'Dried Lavender'],
+            ['Vintage/Ancient', 'Tint', 'Sage Green', 'Copper Leaf', 'Gold Foil Flakes'],
+            ['Minimalist/Clean', 'Solid', 'Pearl White', null, "Baby's Breath"],
+        ] as [$name, $technique, $base, $accent, $insert]) {
+            $moods[$name] = Mood::query()->updateOrCreate(
+                ['name' => $name],
+                [
+                    'is_active' => true,
+                    'preset_json' => [
+                        'technique' => $technique,
+                        'base_color' => $base,
+                        'accent_color' => $accent,
+                        'insert' => $insert,
+                    ],
+                ],
+            );
+        }
 
-        Mold::query()->create([
-            'base_item_id' => $keychain->id,
-            'name' => 'Circle Charm',
-            'size_label' => '4 cm',
-            'depth_mm' => 6.00,
-            'price_delta' => 0,
-        ]);
+        $rules = [
+            ['insert', $inserts['Dried Lavender']->id, OptionRuleAction::Blocks, 'mold', $molds['Slim Rectangle']->id, 'Dried lavender needs at least 8mm of resin depth.'],
+            ['insert', $inserts["Baby's Breath"]->id, OptionRuleAction::Blocks, 'mold', $molds['Slim Rectangle']->id, "Baby's breath is too bulky for the slim bookmark mold."],
+            ['insert', $inserts['Dried Lavender']->id, OptionRuleAction::Requires, 'mold', $molds['Deep Round']->id, 'Use a deep mold so the flowers sit fully under the pour.'],
+            ['technique', $techniques['Marble']->id, OptionRuleAction::Requires, 'color_swatch', $swatches['Metallic Gold']->id, 'Marble looks best with a metallic gold accent vein.'],
+            ['insert', $inserts['Fine Rose Gold Glitter']->id, OptionRuleAction::Blocks, 'technique', $techniques['Marble']->id, 'Fine glitter muddies marble veins; choose solid or gradient instead.'],
+            ['font', $fonts['Script Flourish']->id, OptionRuleAction::Requires, 'base_item', $items['serving-tray']->id, 'Script lettering needs the larger tray surface to stay readable.'],
+            ['insert', $inserts['Gold Foil Flakes']->id, OptionRuleAction::Requires, 'mold', $molds['Deep Rectangle']->id, 'Heavy foil coverage is reserved for the deep tray pour.'],
+            ['insert', $inserts['Dried Lavender']->id, OptionRuleAction::Blocks, 'base_item', $items['letter-keychain']->id, 'Botanical inserts do not fit letter keychains.'],
+        ];
 
-        $pearl = ColorSwatch::query()->create([
-            'name' => 'Pearl White',
-            'hex' => '#F6F1EA',
-            'role' => ColorSwatchRole::Base,
-            'price_delta' => 0,
-            'is_available' => true,
-        ]);
-
-        $ocean = ColorSwatch::query()->create([
-            'name' => 'Ocean Teal',
-            'hex' => '#1B6B6B',
-            'role' => ColorSwatchRole::Base,
-            'price_delta' => 500,
-            'is_available' => true,
-        ]);
-
-        $blush = ColorSwatch::query()->create([
-            'name' => 'Blush Pink',
-            'hex' => '#E8A0BF',
-            'role' => ColorSwatchRole::Base,
-            'price_delta' => 500,
-            'is_available' => true,
-        ]);
-
-        ColorSwatch::query()->create([
-            'name' => 'Sage Green',
-            'hex' => '#9CAF88',
-            'role' => ColorSwatchRole::Base,
-            'price_delta' => 500,
-            'is_available' => true,
-        ]);
-
-        ColorSwatch::query()->create([
-            'name' => 'Charcoal Smoke',
-            'hex' => '#3A3A3A',
-            'role' => ColorSwatchRole::Base,
-            'price_delta' => 0,
-            'is_available' => true,
-        ]);
-
-        $gold = ColorSwatch::query()->create([
-            'name' => 'Metallic Gold',
-            'hex' => '#C9A227',
-            'role' => ColorSwatchRole::Accent,
-            'price_delta' => 1500,
-            'is_available' => true,
-        ]);
-
-        ColorSwatch::query()->create([
-            'name' => 'Copper Leaf',
-            'hex' => '#B87333',
-            'role' => ColorSwatchRole::Accent,
-            'price_delta' => 1500,
-            'is_available' => true,
-        ]);
-
-        $silver = ColorSwatch::query()->create([
-            'name' => 'Silver Mist',
-            'hex' => '#C0C6CE',
-            'role' => ColorSwatchRole::Accent,
-            'price_delta' => 1000,
-            'is_available' => true,
-        ]);
-
-        $solid = Technique::query()->create([
-            'name' => 'Solid',
-            'price_delta' => 0,
-            'labor_minutes' => 0,
-            'requires_accent' => false,
-        ]);
-
-        $gradient = Technique::query()->create([
-            'name' => 'Gradient',
-            'price_delta' => 2500,
-            'labor_minutes' => 15,
-            'requires_accent' => true,
-        ]);
-
-        $marble = Technique::query()->create([
-            'name' => 'Marble',
-            'price_delta' => 3500,
-            'labor_minutes' => 20,
-            'requires_accent' => true,
-        ]);
-
-        Technique::query()->create([
-            'name' => 'Tint',
-            'price_delta' => 1500,
-            'labor_minutes' => 8,
-            'requires_accent' => false,
-        ]);
-
-        $lavender = Insert::query()->create([
-            'type' => InsertType::Flower,
-            'name' => 'Dried Lavender',
-            'color' => 'purple',
-            'price' => 3500,
-            'labor_minutes' => 12,
-            'min_depth_mm' => 8.00,
-            'is_available' => true,
-        ]);
-
-        $babyBreath = Insert::query()->create([
-            'type' => InsertType::Flower,
-            'name' => "Baby's Breath",
-            'color' => 'white',
-            'price' => 3000,
-            'labor_minutes' => 10,
-            'min_depth_mm' => 7.00,
-            'is_available' => true,
-        ]);
-
-        $goldFoil = Insert::query()->create([
-            'type' => InsertType::Foil,
-            'name' => 'Gold Foil Flakes',
-            'color' => 'gold',
-            'price' => 2000,
-            'labor_minutes' => 6,
-            'min_depth_mm' => 4.00,
-            'is_available' => true,
-        ]);
-
-        Insert::query()->create([
-            'type' => InsertType::Shell,
-            'name' => 'Crushed Shell Mix',
-            'color' => 'iridescent',
-            'price' => 2500,
-            'labor_minutes' => 8,
-            'min_depth_mm' => 6.00,
-            'is_available' => true,
-        ]);
-
-        $glitter = Insert::query()->create([
-            'type' => InsertType::Glitter,
-            'name' => 'Fine Rose Gold Glitter',
-            'color' => 'rose gold',
-            'price' => 1500,
-            'labor_minutes' => 5,
-            'min_depth_mm' => 3.00,
-            'is_available' => true,
-        ]);
-
-        $script = Font::query()->create([
-            'name' => 'Script Flourish',
-            'price_delta' => 1500,
-        ]);
-
-        Font::query()->create([
-            'name' => 'Modern Sans',
-            'price_delta' => 0,
-        ]);
-
-        Font::query()->create([
-            'name' => 'Classic Serif',
-            'price_delta' => 500,
-        ]);
-
-        TextColor::query()->create([
-            'name' => 'Gold Leaf',
-            'price_delta' => 1000,
-        ]);
-
-        TextColor::query()->create([
-            'name' => 'Pearl White',
-            'price_delta' => 0,
-        ]);
-
-        TextColor::query()->create([
-            'name' => 'Ink Black',
-            'price_delta' => 0,
-        ]);
-
-        TextColor::query()->create([
-            'name' => 'Silver',
-            'price_delta' => 800,
-        ]);
-
-        Mood::query()->create([
-            'name' => 'Coastal Calm',
-            'is_active' => true,
-            'preset_json' => [
-                'technique' => $gradient->name,
-                'base_color' => $ocean->name,
-                'accent_color' => $silver->name,
-                'insert' => $goldFoil->name,
-            ],
-        ]);
-
-        Mood::query()->create([
-            'name' => 'Blush Garden',
-            'is_active' => true,
-            'preset_json' => [
-                'technique' => $marble->name,
-                'base_color' => $blush->name,
-                'accent_color' => $gold->name,
-                'insert' => $lavender->name,
-            ],
-        ]);
-
-        Mood::query()->create([
-            'name' => 'Quiet Pearl',
-            'is_active' => true,
-            'preset_json' => [
-                'technique' => $solid->name,
-                'base_color' => $pearl->name,
-                'accent_color' => null,
-                'insert' => $babyBreath->name,
-            ],
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'insert',
-            'subject_id' => $lavender->id,
-            'rule' => OptionRuleAction::Blocks,
-            'target_type' => 'mold',
-            'target_id' => $bookmarkSlim->id,
-            'message' => 'Dried lavender needs at least 8mm of resin depth.',
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'insert',
-            'subject_id' => $babyBreath->id,
-            'rule' => OptionRuleAction::Blocks,
-            'target_type' => 'mold',
-            'target_id' => $bookmarkSlim->id,
-            'message' => "Baby's breath is too bulky for the slim bookmark mold.",
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'insert',
-            'subject_id' => $lavender->id,
-            'rule' => OptionRuleAction::Requires,
-            'target_type' => 'mold',
-            'target_id' => $coasterDeep->id,
-            'message' => 'Use a deep mold so the flowers sit fully under the pour.',
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'technique',
-            'subject_id' => $marble->id,
-            'rule' => OptionRuleAction::Requires,
-            'target_type' => 'color_swatch',
-            'target_id' => $gold->id,
-            'message' => 'Marble looks best with a metallic gold accent vein.',
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'insert',
-            'subject_id' => $glitter->id,
-            'rule' => OptionRuleAction::Blocks,
-            'target_type' => 'technique',
-            'target_id' => $marble->id,
-            'message' => 'Fine glitter muddies marble veins; choose solid or gradient instead.',
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'font',
-            'subject_id' => $script->id,
-            'rule' => OptionRuleAction::Requires,
-            'target_type' => 'base_item',
-            'target_id' => $tray->id,
-            'message' => 'Script lettering needs the larger tray surface to stay readable.',
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'insert',
-            'subject_id' => $goldFoil->id,
-            'rule' => OptionRuleAction::Requires,
-            'target_type' => 'mold',
-            'target_id' => $trayDeep->id,
-            'message' => 'Heavy foil coverage is reserved for the deep tray pour.',
-        ]);
-
-        OptionRule::query()->create([
-            'subject_type' => 'insert',
-            'subject_id' => $lavender->id,
-            'rule' => OptionRuleAction::Blocks,
-            'target_type' => 'base_item',
-            'target_id' => $keychain->id,
-            'message' => 'Botanical inserts do not fit letter keychains.',
-        ]);
+        foreach ($rules as [$subjectType, $subjectId, $rule, $targetType, $targetId, $message]) {
+            OptionRule::query()->updateOrCreate(
+                [
+                    'subject_type' => $subjectType,
+                    'subject_id' => $subjectId,
+                    'rule' => $rule,
+                    'target_type' => $targetType,
+                    'target_id' => $targetId,
+                ],
+                ['subject_type' => $subjectType, 'subject_id' => $subjectId, 'rule' => $rule,
+                    'target_type' => $targetType, 'target_id' => $targetId, 'message' => $message],
+            );
+        }
     }
 }

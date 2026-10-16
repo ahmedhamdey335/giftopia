@@ -1,0 +1,35 @@
+<?php
+
+use App\Http\Controllers\Admin\CatalogController;
+use App\Http\Controllers\AuthController;
+use App\Support\CatalogRegistry;
+use Illuminate\Support\Facades\Route;
+
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+
+    Route::prefix('admin/catalog')->name('admin.catalog.')->group(function () {
+        Route::middleware('role:admin')->group(function () {
+            foreach (array_keys(CatalogRegistry::definitions()) as $catalogType) {
+                Route::apiResource($catalogType, CatalogController::class)
+                    ->parameters([$catalogType => 'id'])
+                    ->names($catalogType)
+                    ->except([]);
+            }
+        });
+
+        Route::middleware('role:admin,producer')->group(function () {
+            foreach (CatalogRegistry::definitions() as $catalogType => $definition) {
+                if ($definition['availability'] !== null) {
+                    Route::patch($catalogType.'/{id}/availability', [CatalogController::class, 'availability'])
+                        ->whereNumber('id')
+                        ->name($catalogType.'.availability');
+                }
+            }
+        });
+    });
+});
