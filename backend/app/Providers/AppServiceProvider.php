@@ -13,8 +13,9 @@ use App\Models\Technique;
 use App\Models\TextColor;
 use App\Models\User;
 use App\Policies\OrderPolicy;
-use App\Services\Payments\CashOnDeliveryGateway;
+use App\Services\Payments\FakePaymentGateway;
 use App\Services\Payments\PaymentGateway;
+use App\Services\Payments\PaymobGateway;
 use App\Services\Studio\FixedLeadTimeEstimator;
 use App\Services\Studio\LeadTimeEstimator;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -26,7 +27,13 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(LeadTimeEstimator::class, FixedLeadTimeEstimator::class);
-        $this->app->bind(PaymentGateway::class, CashOnDeliveryGateway::class);
+        $this->app->bind(PaymentGateway::class, function ($app): PaymentGateway {
+            return match (config('services.payments.gateway')) {
+                'fake' => $app->make(FakePaymentGateway::class),
+                'paymob' => $app->make(PaymobGateway::class),
+                default => throw new \InvalidArgumentException('Unsupported payment gateway configuration.'),
+            };
+        });
     }
 
     public function boot(): void

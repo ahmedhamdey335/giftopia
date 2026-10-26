@@ -2,23 +2,24 @@
 
 namespace App\Services\Checkout;
 
-use App\Enums\ProductionEventType;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentKind;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Enums\ProductionStatus;
 use App\Exceptions\CheckoutException;
-use App\Mail\OrderConfirmationMail;
 use App\Models\Asset;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Models\User;
 use App\Services\CompatibilityValidator;
-use App\Services\Payments\PaymentGateway;
+use App\Services\Payments\PaymentService;
 use App\Services\Studio\PriceCalculator;
 use App\Services\Studio\SnapshotBuilder;
 use App\Services\Studio\StudioConfiguration;
 use App\Services\Studio\StudioQuoteService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 final class CheckoutService
@@ -27,7 +28,7 @@ final class CheckoutService
         private readonly CompatibilityValidator $compatibility,
         private readonly PriceCalculator $prices,
         private readonly SnapshotBuilder $snapshots,
-        private readonly PaymentGateway $payments,
+        private readonly PaymentService $payments,
         private readonly StudioQuoteService $quotes,
     ) {}
 
@@ -46,7 +47,11 @@ final class CheckoutService
                     ->with('items')
                     ->first();
                 if ($existing) {
-                    return CheckoutResult::order($existing, existing: true);
+                    return CheckoutResult::order(
+                        $existing,
+                        $this->payments->pendingAttempt($existing, PaymentKind::Deposit),
+                        existing: true,
+                    );
                 }
 
                 $quote = Quote::query()
@@ -93,17 +98,40 @@ final class CheckoutService
                     return CheckoutResult::quote($this->quotes->create($configuration, $user));
                 }
 
-                $payment = $this->payments->initialize($input['payment_method']);
+                $deliveryFee = (int) config('studio.delivery.fee', 0);
+                if ($deliveryFee < 0) {
+                    throw new \LogicException('The configured delivery fee cannot be negative.');
+                }
+                $subtotal = (int) $price['total'];
+                $total = $subtotal + $deliveryFee;
+                $depositPercent = (int) config('studio.delivery.deposit_percent', 50);
+                if ($depositPercent < 1 || $depositPercent > 100) {
+                    throw new \LogicException('The configured deposit percentage must be between 1 and 100.');
+                }
+                $depositAmount = intdiv(($total * $depositPercent) + 99, 100);
+                $balanceAmount = $total - $depositAmount;
+                $orderPrice = $price;
+                $orderPrice['items'][] = [
+                    'key' => 'delivery_fee',
+                    'id' => 0,
+                    'name' => 'Delivery fee',
+                    'amount' => $deliveryFee,
+                ];
+                $orderPrice['total'] = $total;
                 $shipping = $input['shipping'];
                 $giftOptions = $input['gift_options'] ?? [];
                 $order = Order::query()->create([
                     'user_id' => $user->id,
                     'order_number' => 'GFT-'.$acceptedAt->format('ymd').'-'.Str::upper(Str::random(8)),
-                    'status' => $payment->orderStatus,
+                    'status' => OrderStatus::AwaitingDeposit,
                     'currency' => (string) config('studio.currency', 'EGP'),
-                    'subtotal' => $price['total'],
-                    'total' => $price['total'],
-                    'price_breakdown' => $price,
+                    'subtotal' => $subtotal,
+                    'delivery_fee' => $deliveryFee,
+                    'total' => $total,
+                    'deposit_amount' => $depositAmount,
+                    'balance_amount' => $balanceAmount,
+                    'amount_paid' => 0,
+                    'price_breakdown' => $orderPrice,
                     'shipping_name' => $shipping['recipient_name'],
                     'shipping_phone' => $shipping['phone'],
                     'shipping_address_line1' => $shipping['address_line1'],
@@ -113,8 +141,9 @@ final class CheckoutService
                     'shipping_postal_code' => $shipping['postal_code'] ?? null,
                     'shipping_country' => $shipping['country'],
                     'payment_method' => $input['payment_method'],
-                    'payment_status' => $payment->paymentStatus,
+                    'payment_status' => PaymentStatus::Unpaid,
                     'ready_by' => $quote->ready_at,
+                    'deposit_expires_at' => $acceptedAt->addHours((int) config('studio.delivery.deposit_hold_hours', 24)),
                     'accepted_terms_at' => $acceptedAt,
                     'gift_wrap' => (bool) ($giftOptions['gift_wrap'] ?? false),
                     'gift_message' => $giftOptions['gift_message'] ?? null,
@@ -167,19 +196,13 @@ final class CheckoutService
                         'attached_at' => $acceptedAt,
                     ]);
                 }
-                $order->productionEvents()->create([
-                    'actor_id' => $user->id,
-                    'event_type' => ProductionEventType::Placed,
-                ]);
+                $payment = $this->payments->createAttempt(
+                    $order,
+                    PaymentKind::Deposit,
+                    PaymentMethod::from($input['payment_method']),
+                );
 
-                $orderId = $order->id;
-                DB::afterCommit(static function () use ($orderId): void {
-                    $committedOrder = Order::query()->with('items')->findOrFail($orderId);
-                    Mail::to($committedOrder->user->email)
-                        ->queue((new OrderConfirmationMail($committedOrder))->afterCommit());
-                });
-
-                return CheckoutResult::order($order->load('items'));
+                return CheckoutResult::order($order->load('items'), $payment);
             });
         } catch (QueryException $exception) {
             if (! $this->isIdempotencyConflict($exception)) {

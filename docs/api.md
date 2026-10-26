@@ -160,12 +160,12 @@ Content-Type: application/json
     "phone": "+201234567890",
     "address_line1": "10 Example Street",
     "address_line2": null,
-    "city": "Cairo",
-    "governorate": "Cairo",
+    "city": "Tanta",
+    "governorate": "Gharbia",
     "postal_code": "11511",
     "country": "Egypt"
   },
-  "payment_method": "cash_on_delivery",
+  "payment_method": "card",
   "gift_options": {
     "gift_wrap": true,
     "gift_message": "Happy birthday"
@@ -178,12 +178,15 @@ Content-Type: application/json
 }
 ```
 
-A successful first submission returns `201` with an order number, status,
-itemized total, shipping data, `ready_by`, and the customer's customization
-snapshot. Reusing the same idempotency key for that customer returns the
-original order with `200`. If current catalog pricing changed, checkout returns
-`409` with a fresh quote to review. Expired quotes return `422`, quotes owned
-by another customer return `403`, and unavailable configurations return `422`.
+A successful first submission returns `201` with an order number, an
+`awaiting_deposit` status, itemized total, shipping data, an indicative
+`ready_by`, the customer's customization snapshot, and a pending deposit
+payment intent. Deposit is `ceil(total * deposit_percent / 100)`; delivery fee
+is included in `total`. Reusing the same idempotency key returns the original
+order and open deposit attempt with `200`. If current catalog pricing changed,
+checkout returns `409` with a fresh quote to review. Expired quotes return
+`422`, quotes owned by another customer return `403`, and unavailable
+configurations return `422`. Launch delivery accepts Tanta / Gharbia only.
 
 Example successful response excerpt (minor-unit amounts shown; other order and snapshot fields are omitted):
 
@@ -194,13 +197,27 @@ Example successful response excerpt (minor-unit amounts shown; other order and s
   "data": {
     "id": 42,
     "order_number": "GFT-261016-AB12CD34",
-    "status": "placed",
+    "status": "awaiting_deposit",
     "currency": "EGP",
     "subtotal": 28000,
+    "delivery_fee": 0,
     "total": 28000,
-    "payment_method": "cash_on_delivery",
-    "payment_status": "pending",
+    "deposit_amount": 14000,
+    "balance_amount": 14000,
+    "payment_method": "card",
+    "payment_status": "unpaid",
+    "payment_summary": {
+      "deposit_amount": 14000,
+      "balance_amount": 14000,
+      "amount_paid": 0,
+      "due_now": 14000
+    },
     "ready_by": "2026-10-20T10:00:00+03:00",
+    "payment": {
+      "redirect_url": "https://shop.example.test/payments/fake?reference=...",
+      "amount": 14000,
+      "expires_at": "2026-10-17T10:00:00+03:00"
+    },
     "items": [
       {
         "id": 61,
@@ -218,9 +235,37 @@ Example successful response excerpt (minor-unit amounts shown; other order and s
 }
 ```
 
-The default driver places cash-on-delivery orders as `placed`; generic online
-payment methods remain `awaiting_payment` with payment status `pending`. No
-payment provider is integrated.
+### `POST /api/orders/{order}/payments`
+
+Customer owner only. Accepts `kind` (`deposit` or `balance`) and `method`
+(`card` or `wallet`). A deposit is payable only while the order is
+`awaiting_deposit`; a balance is payable only while it is `awaiting_balance`.
+Repeating an open attempt with the same method returns that attempt.
+
+### `POST /api/payments/webhook/{provider}`
+
+Unauthenticated, signature-verified server callback. Processing is idempotent.
+Unknown payment references return `200` without a state change. Browser
+redirects never update payment state. Fake webhook test payloads use
+`reference`, `status` (`succeeded`, `failed`, `cancelled`), and `amount`, signed
+with `X-Fake-Signature`.
+
+### `POST /api/orders/{order}/cancel`
+
+Customer owner only; cancels only orders still `awaiting_deposit` and cancels
+their open deposit attempt.
+
+Order statuses are `awaiting_deposit`, `confirmed`, `awaiting_balance`,
+`ready_for_delivery`, `out_for_delivery`, `delivered`, `cancelled`, and
+`refunded`. Payment statuses are `unpaid`, `deposit_paid`, `paid`,
+`partially_refunded`, and `refunded`. Customer order data includes a display
+label, deposit/balance/paid amounts, and the amount due now.
+
+The fake gateway is the default outside production. The Paymob adapter is
+intentionally a documented skeleton: this environment exposed the overview
+page but not the exact API-reference and HMAC specification. Do not enable
+`PAYMENT_GATEWAY=paymob` until those provider-specific details and account
+configuration have been verified.
 
 ### `GET /api/orders`
 

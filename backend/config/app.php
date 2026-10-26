@@ -54,7 +54,7 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
-    'frontend_url' => env('FRONTEND_URL', ''),
+    'frontend_url' => trim(explode(',', (string) env('FRONTEND_URL', ''))[0]),
 
     /*
     |--------------------------------------------------------------------------

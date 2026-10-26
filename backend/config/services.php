@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'payments' => [
+        'gateway' => env('PAYMENT_GATEWAY', env('APP_ENV') === 'production' ? 'paymob' : 'fake'),
+        'fake_webhook_secret' => env('FAKE_PAYMENT_WEBHOOK_SECRET'),
+        'paymob' => [
+            'base_url' => env('PAYMOB_BASE_URL', 'https://accept.paymob.com'),
+            'secret_key' => env('PAYMOB_SECRET_KEY'),
+            'public_key' => env('PAYMOB_PUBLIC_KEY'),
+            'hmac_secret' => env('PAYMOB_HMAC_SECRET'),
+            'integration_id_card' => env('PAYMOB_INTEGRATION_ID_CARD'),
+            'integration_id_wallet' => env('PAYMOB_INTEGRATION_ID_WALLET'),
+        ],
+    ],
+
 ];

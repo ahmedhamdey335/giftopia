@@ -36,9 +36,15 @@ class OrderController extends Controller
         }
 
         $order = $result->order->load('items');
+        $data = (new CustomerOrderResource($order))->resolve($request);
+        $data['payment'] = $result->payment === null ? null : [
+            'redirect_url' => $result->payment->redirect_url,
+            'amount' => $result->payment->amount,
+            'expires_at' => $order->deposit_expires_at?->toIso8601String(),
+        ];
 
         return ApiResponse::success(
-            (new CustomerOrderResource($order))->resolve($request),
+            $data,
             $result->status === 201 ? 'Order placed.' : 'Existing order returned.',
             $result->status,
         );

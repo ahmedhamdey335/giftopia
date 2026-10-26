@@ -1,9 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\CatalogController;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\StudioController;
 use App\Support\CatalogRegistry;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,10 @@ Route::get('/assets/{asset}/file', [AssetController::class, 'file'])
     ->middleware('signed')
     ->name('assets.file');
 
+Route::post('/payments/webhook/{provider}', [PaymentController::class, 'webhook'])
+    ->middleware('throttle:60,1')
+    ->name('payments.webhook');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
@@ -34,6 +39,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/checkout', [OrderController::class, 'store'])->name('checkout');
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+        Route::post('/orders/{order}/payments', [PaymentController::class, 'store'])->name('orders.payments');
+        Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancel'])->name('orders.cancel');
     });
 
     Route::prefix('admin/catalog')->name('admin.catalog.')->group(function () {

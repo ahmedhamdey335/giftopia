@@ -13,8 +13,10 @@ class CustomerOrderResource extends JsonResource
             'id' => $this->id,
             'order_number' => strip_tags($this->order_number),
             'status' => $this->status->value,
+            'status_label' => $this->statusLabel($this->status->value),
             'currency' => $this->currency,
             'subtotal' => $this->subtotal,
+            'delivery_fee' => $this->delivery_fee,
             'total' => $this->total,
             'price_breakdown' => $this->sanitize($this->price_breakdown),
             'shipping' => [
@@ -29,6 +31,16 @@ class CustomerOrderResource extends JsonResource
             ],
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status->value,
+            'payment_summary' => [
+                'deposit_amount' => $this->deposit_amount,
+                'balance_amount' => $this->balance_amount,
+                'amount_paid' => $this->amount_paid,
+                'due_now' => match ($this->status->value) {
+                    'awaiting_deposit' => $this->deposit_amount,
+                    'awaiting_balance' => $this->balance_amount,
+                    default => 0,
+                },
+            ],
             'ready_by' => $this->ready_by->toIso8601String(),
             'accepted_terms_at' => $this->accepted_terms_at->toIso8601String(),
             'gift_options' => [
@@ -81,5 +93,20 @@ class CustomerOrderResource extends JsonResource
         }
 
         return $clean;
+    }
+
+    private function statusLabel(string $status): string
+    {
+        return match ($status) {
+            'awaiting_deposit' => 'Awaiting deposit',
+            'confirmed' => 'Confirmed',
+            'awaiting_balance' => 'Awaiting balance',
+            'ready_for_delivery' => 'Ready for delivery',
+            'out_for_delivery' => 'Out for delivery',
+            'delivered' => 'Delivered',
+            'cancelled' => 'Cancelled',
+            'refunded' => 'Refunded',
+            default => 'Processing',
+        };
     }
 }

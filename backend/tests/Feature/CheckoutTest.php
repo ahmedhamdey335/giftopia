@@ -6,6 +6,8 @@ use App\Enums\ColorSwatchRole;
 use App\Enums\InsertType;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentRecordStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\ProductionEventType;
 use App\Enums\ProductionStatus;
 use App\Mail\OrderConfirmationMail;
@@ -17,12 +19,11 @@ use App\Models\Insert;
 use App\Models\Mold;
 use App\Models\Mood;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Quote;
 use App\Models\Technique;
 use App\Models\TextColor;
 use App\Models\User;
-use App\Services\Payments\FakePaymentGateway;
-use App\Services\Payments\PaymentGateway;
 use App\Services\Studio\StudioConfiguration;
 use App\Services\Studio\StudioQuoteService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,7 +34,7 @@ class CheckoutTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_checkout_creates_an_immutable_snapshot_order_and_queues_confirmation(): void
+    public function test_checkout_creates_an_immutable_snapshot_and_pending_deposit_payment(): void
     {
         Mail::fake();
         $user = User::factory()->create();
@@ -44,13 +45,16 @@ class CheckoutTest extends TestCase
             ->withHeader('Idempotency-Key', 'checkout-happy-path')
             ->postJson('/api/checkout', $payload)
             ->assertCreated()
-            ->assertJsonPath('data.status', 'placed')
+            ->assertJsonPath('data.status', 'awaiting_deposit')
+            ->assertJsonPath('data.payment_status', 'unpaid')
             ->assertJsonPath('data.total', $quote->total_price)
             ->assertJsonPath('data.ready_by', $quote->ready_at->toIso8601String())
             ->assertJsonPath('data.shipping.recipient_name', 'Alice')
             ->assertJsonPath('data.items.0.customization.personalization.note', 'Please center it')
             ->assertJsonMissingPath('data.items.0.labor_minutes_total')
             ->assertJsonMissingPath('data.items.0.customization.labor_minutes');
+        $response->assertJsonPath('data.payment.amount', intdiv(($quote->total_price * 50) + 99, 100));
+        $response->assertJsonPath('data.payment.expires_at', now()->addHours(24)->toIso8601String());
 
         $order = Order::query()->with('items', 'productionEvents')->firstOrFail();
         $item = $order->items->firstOrFail();
@@ -65,12 +69,12 @@ class CheckoutTest extends TestCase
         $this->assertNotNull($item->customization['acknowledgments']['handmade_variation']['accepted_at']);
         $this->assertTrue($item->customization['acknowledgments']['refund_policy']['accepted']);
         $this->assertTrue($item->customization['acknowledgments']['proof_auto_approval']['accepted']);
-        $this->assertSame(ProductionEventType::Placed, $order->productionEvents->first()->event_type);
+        $this->assertCount(0, $order->productionEvents);
+        $this->assertSame(PaymentStatus::Unpaid, $order->payment_status);
+        $this->assertSame(1, $order->payments()->count());
+        $this->assertSame($order->deposit_amount, $order->payments()->firstOrFail()->amount);
         $this->assertNotNull($quote->fresh()->used_at);
-
-        $readyDate = $order->ready_by->setTimezone('Africa/Cairo')->format('F j, Y');
-        Mail::assertQueued(OrderConfirmationMail::class, fn (OrderConfirmationMail $mail): bool => $mail->order->order_number === $response->json('data.order_number')
-            && $mail->content()->with['readyDate'] === $readyDate);
+        Mail::assertNothingQueued();
     }
 
     public function test_checkout_ignores_client_supplied_prices_and_customization(): void
@@ -274,8 +278,9 @@ class CheckoutTest extends TestCase
         $this->assertSame($first->json('data.id'), $second->json('data.id'));
         $this->assertDatabaseCount('orders', 1);
         $this->assertDatabaseCount('order_items', 1);
-        $this->assertDatabaseCount('production_events', 1);
-        Mail::assertQueued(OrderConfirmationMail::class, 1);
+        $this->assertDatabaseCount('production_events', 0);
+        $this->assertDatabaseCount('payments', 1);
+        Mail::assertNothingQueued();
     }
 
     public function test_missing_acknowledgments_are_rejected_and_no_confirmation_is_queued(): void
@@ -296,6 +301,27 @@ class CheckoutTest extends TestCase
         Mail::assertNothingQueued();
     }
 
+    public function test_proof_auto_approval_acknowledgment_is_only_required_for_personalized_orders(): void
+    {
+        $user = User::factory()->create();
+        [, $configuration] = $this->makeQuote($user);
+        $withoutText = StudioConfiguration::fromArray([
+            ...$configuration->normalizedConfiguration(),
+            'personalization_text' => null,
+        ]);
+        $quote = app(StudioQuoteService::class)->create($withoutText, $user);
+        $payload = $this->checkoutPayload($quote);
+        unset($payload['acknowledgments']['proof_auto_approval']);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'no-proof-needed')
+            ->postJson('/api/checkout', $payload)
+            ->assertCreated();
+
+        $item = Order::query()->findOrFail($response->json('data.id'))->items->firstOrFail();
+        $this->assertArrayNotHasKey('proof_auto_approval', $item->customization['acknowledgments']);
+    }
+
     public function test_acknowledgments_must_be_boolean_true(): void
     {
         $user = User::factory()->create();
@@ -310,20 +336,209 @@ class CheckoutTest extends TestCase
             ->assertJsonValidationErrors(['acknowledgments.handmade_variation']);
     }
 
-    public function test_fake_gateway_can_place_an_online_order_in_awaiting_payment_status(): void
+    public function test_fake_gateway_creates_card_deposit_payment_attempt(): void
     {
-        $this->app->instance(PaymentGateway::class, new FakePaymentGateway);
         $user = User::factory()->create();
         [$quote] = $this->makeQuote($user);
         $payload = $this->checkoutPayload($quote);
-        $payload['payment_method'] = PaymentMethod::Online->value;
+        $payload['payment_method'] = PaymentMethod::Card->value;
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->withHeader('Idempotency-Key', 'online-fake')
             ->postJson('/api/checkout', $payload)
             ->assertCreated()
-            ->assertJsonPath('data.status', OrderStatus::AwaitingPayment->value)
-            ->assertJsonPath('data.payment_status', 'pending');
+            ->assertJsonPath('data.status', OrderStatus::AwaitingDeposit->value)
+            ->assertJsonPath('data.payment_status', PaymentStatus::Unpaid->value);
+
+        $payment = Payment::query()->firstOrFail();
+        $this->assertSame('fake', $payment->provider);
+        $this->assertSame(PaymentMethod::Card, $payment->method);
+        $this->assertSame($payment->amount, $response->json('data.payment.amount'));
+    }
+
+    public function test_deposit_webhook_confirms_order_once_and_queues_confirmation_after_success(): void
+    {
+        Mail::fake();
+        config(['services.payments.fake_webhook_secret' => 'test-webhook-secret']);
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'deposit-webhook')
+            ->postJson('/api/checkout', $this->checkoutPayload($quote))
+            ->assertCreated();
+        $order = Order::query()->findOrFail($response->json('data.id'));
+        $payment = $order->payments()->firstOrFail();
+        $payload = [
+            'reference' => $payment->provider_reference,
+            'status' => PaymentRecordStatus::Succeeded->value,
+            'amount' => $payment->amount,
+        ];
+        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+        $headers = [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_FAKE_SIGNATURE' => hash_hmac('sha256', $body, 'test-webhook-secret'),
+        ];
+
+        $this->call('POST', '/api/payments/webhook/fake', [], [], [], $headers, $body)->assertOk();
+        $order->refresh();
+        $payment->refresh();
+
+        $this->assertSame(OrderStatus::Confirmed, $order->status);
+        $this->assertSame(PaymentStatus::DepositPaid, $order->payment_status);
+        $this->assertSame($payment->amount, $order->amount_paid);
+        $this->assertSame(PaymentRecordStatus::Succeeded, $payment->status);
+        $this->assertEquals($payment->paid_at->copy()->addDays(7), $order->ready_by);
+        $this->assertDatabaseHas('production_events', [
+            'order_id' => $order->id,
+            'event_type' => ProductionEventType::DepositReceived->value,
+        ]);
+        Mail::assertQueued(OrderConfirmationMail::class, 1);
+
+        $this->call('POST', '/api/payments/webhook/fake', [], [], [], $headers, $body)->assertOk();
+        $this->assertSame($payment->amount, $order->fresh()->amount_paid);
+        $this->assertDatabaseCount('production_events', 1);
+        Mail::assertQueued(OrderConfirmationMail::class, 1);
+    }
+
+    public function test_forged_payment_webhook_is_rejected_without_changing_payment_state(): void
+    {
+        config(['services.payments.fake_webhook_secret' => 'test-webhook-secret']);
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'forged-webhook')
+            ->postJson('/api/checkout', $this->checkoutPayload($quote))
+            ->assertCreated();
+        $payment = Payment::query()->firstOrFail();
+        $body = json_encode([
+            'reference' => $payment->provider_reference,
+            'status' => 'succeeded',
+            'amount' => $payment->amount,
+        ], JSON_THROW_ON_ERROR);
+
+        $this->call('POST', '/api/payments/webhook/fake', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_FAKE_SIGNATURE' => 'forged',
+        ], $body)->assertUnauthorized();
+
+        $this->assertSame(PaymentRecordStatus::Pending, $payment->fresh()->status);
+        $this->assertSame(OrderStatus::AwaitingDeposit, $payment->order->fresh()->status);
+    }
+
+    public function test_unknown_payment_reference_is_acknowledged_without_side_effects(): void
+    {
+        config(['services.payments.fake_webhook_secret' => 'test-webhook-secret']);
+        $body = json_encode([
+            'reference' => 'unknown-reference',
+            'status' => 'succeeded',
+            'amount' => 1200,
+        ], JSON_THROW_ON_ERROR);
+
+        $this->call('POST', '/api/payments/webhook/fake', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_FAKE_SIGNATURE' => hash_hmac('sha256', $body, 'test-webhook-secret'),
+        ], $body)->assertOk();
+
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_expired_deposit_hold_cancels_order_and_pending_attempt(): void
+    {
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'expired-deposit')
+            ->postJson('/api/checkout', $this->checkoutPayload($quote))
+            ->assertCreated();
+        $order = Order::query()->findOrFail($response->json('data.id'));
+        $order->update(['deposit_expires_at' => now()->subSecond()]);
+
+        $this->artisan('giftopia:expire-unpaid-orders')->assertSuccessful();
+
+        $this->assertSame(OrderStatus::Cancelled, $order->fresh()->status);
+        $this->assertSame(PaymentRecordStatus::Cancelled, $order->payments()->firstOrFail()->fresh()->status);
+    }
+
+    public function test_balance_payment_is_rejected_before_order_awaits_balance(): void
+    {
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'premature-balance')
+            ->postJson('/api/checkout', $this->checkoutPayload($quote))
+            ->assertCreated();
+
+        $this->postJson('/api/orders/'.$response->json('data.id').'/payments', [
+            'kind' => 'balance',
+            'method' => 'card',
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseCount('payments', 1);
+    }
+
+    public function test_deposit_amount_uses_configured_delivery_fee_and_rounds_up(): void
+    {
+        config([
+            'studio.delivery.fee' => 101,
+            'studio.delivery.deposit_percent' => 33,
+        ]);
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'deposit-rounding')
+            ->postJson('/api/checkout', $this->checkoutPayload($quote))
+            ->assertCreated();
+        $total = $quote->total_price + 101;
+        $expectedDeposit = intdiv(($total * 33) + 99, 100);
+
+        $response->assertJsonPath('data.subtotal', $quote->total_price)
+            ->assertJsonPath('data.delivery_fee', 101)
+            ->assertJsonPath('data.total', $total)
+            ->assertJsonPath('data.payment_summary.deposit_amount', $expectedDeposit)
+            ->assertJsonPath('data.payment_summary.balance_amount', $total - $expectedDeposit)
+            ->assertJsonPath('data.payment_summary.due_now', $expectedDeposit);
+    }
+
+    public function test_customer_can_reuse_open_deposit_attempt_and_cancel_before_payment(): void
+    {
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $checkout = $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'open-deposit')
+            ->postJson('/api/checkout', $this->checkoutPayload($quote))
+            ->assertCreated();
+        $orderId = $checkout->json('data.id');
+        $firstReference = Payment::query()->firstOrFail()->provider_reference;
+
+        $this->postJson('/api/orders/'.$orderId.'/payments', [
+            'kind' => 'deposit',
+            'method' => 'card',
+        ])->assertOk();
+
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertSame($firstReference, Payment::query()->firstOrFail()->provider_reference);
+
+        $this->postJson('/api/orders/'.$orderId.'/cancel')
+            ->assertOk()
+            ->assertJsonPath('data.status', OrderStatus::Cancelled->value);
+        $this->assertSame(PaymentRecordStatus::Cancelled, Payment::query()->firstOrFail()->fresh()->status);
+    }
+
+    public function test_checkout_rejects_removed_payment_methods(): void
+    {
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $payload = $this->checkoutPayload($quote);
+        $payload['payment_method'] = 'cash_on_delivery';
+
+        $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'no-cash')
+            ->postJson('/api/checkout', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['payment_method']);
+
+        $this->assertDatabaseCount('orders', 0);
     }
 
     public function test_customers_can_only_list_and_view_their_own_orders(): void
@@ -416,7 +631,7 @@ class CheckoutTest extends TestCase
                 'postal_code' => '11511',
                 'country' => 'Egypt',
             ],
-            'payment_method' => PaymentMethod::CashOnDelivery->value,
+            'payment_method' => PaymentMethod::Card->value,
             'gift_options' => [
                 'gift_wrap' => true,
                 'gift_message' => '<b>Happy birthday</b>',

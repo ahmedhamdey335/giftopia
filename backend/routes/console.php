@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('giftopia:purge-orphan-assets')->hourly();
+Schedule::command('giftopia:expire-unpaid-orders')->everyFifteenMinutes();

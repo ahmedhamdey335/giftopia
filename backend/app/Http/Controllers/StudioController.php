@@ -17,8 +17,8 @@ use App\Services\Studio\PriceCalculator;
 use App\Services\Studio\StudioConfiguration;
 use App\Services\Studio\StudioQuoteService;
 use App\Support\ApiResponse;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 
 class StudioController extends Controller
 {
