@@ -9,10 +9,12 @@ use App\Models\Insert;
 use App\Models\Mold;
 use App\Models\Mood;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Technique;
 use App\Models\TextColor;
 use App\Models\User;
 use App\Policies\OrderPolicy;
+use App\Policies\ProductionSheetPolicy;
 use App\Services\Payments\FakePaymentGateway;
 use App\Services\Payments\PaymentGateway;
 use App\Services\Payments\PaymobGateway;
@@ -39,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Order::class, OrderPolicy::class);
+        Gate::policy(OrderItem::class, ProductionSheetPolicy::class);
 
         Relation::enforceMorphMap([
             'base_item' => BaseItem::class,

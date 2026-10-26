@@ -10,8 +10,11 @@ class ProductionEvent extends Model
 {
     protected $fillable = [
         'order_id',
+        'order_item_id',
         'actor_id',
         'event_type',
+        'from_status',
+        'to_status',
         'note',
     ];
 

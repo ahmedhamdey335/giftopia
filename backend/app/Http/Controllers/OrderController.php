@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ProductionEventType;
 use App\Exceptions\CheckoutException;
 use App\Http\Requests\CheckoutRequest;
 use App\Http\Resources\CustomerOrderResource;
@@ -75,5 +76,48 @@ class OrderController extends Controller
         return ApiResponse::success(
             (new CustomerOrderResource($order->load('items')))->resolve($request),
         );
+    }
+
+    public function timeline(Request $request, Order $order): JsonResponse
+    {
+        $this->authorize('view', $order);
+        $safeTypes = [
+            ProductionEventType::DepositReceived,
+            ProductionEventType::PaymentFailed,
+            ProductionEventType::ProofRequested,
+            ProductionEventType::ProofApproved,
+            ProductionEventType::ProofChangesRequested,
+            ProductionEventType::BalanceRequested,
+            ProductionEventType::BalanceReceived,
+            ProductionEventType::OutForDelivery,
+            ProductionEventType::Delivered,
+            ProductionEventType::RefundRequested,
+            ProductionEventType::RefundDecided,
+        ];
+        $labels = [
+            'deposit_received' => 'Deposit paid',
+            'payment_failed' => 'Payment attempt failed',
+            'proof_requested' => 'Personalization proof requested',
+            'proof_approved' => 'Proof approved',
+            'proof_changes_requested' => 'Proof changes requested',
+            'balance_requested' => 'Balance payment requested',
+            'balance_received' => 'Balance paid',
+            'out_for_delivery' => 'Out for delivery',
+            'delivered' => 'Delivered',
+            'refund_requested' => 'Refund requested',
+            'refund_decided' => 'Refund decision updated',
+        ];
+        $events = $order->productionEvents()
+            ->whereIn('event_type', array_map(static fn (ProductionEventType $type): string => $type->value, $safeTypes))
+            ->oldest()
+            ->get()
+            ->map(fn ($event): array => [
+                'type' => $event->event_type->value,
+                'label' => $labels[$event->event_type->value],
+                'created_at' => $event->created_at->toIso8601String(),
+            ])
+            ->values();
+
+        return ApiResponse::success(['events' => $events]);
     }
 }

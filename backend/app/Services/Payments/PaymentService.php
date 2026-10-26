@@ -12,13 +12,17 @@ use App\Exceptions\CheckoutException;
 use App\Mail\OrderConfirmationMail;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\Production\TransitionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 final class PaymentService
 {
-    public function __construct(private readonly PaymentGateway $gateway) {}
+    public function __construct(
+        private readonly PaymentGateway $gateway,
+        private readonly TransitionService $transitions,
+    ) {}
 
     public function createAttempt(Order $order, PaymentKind $kind, PaymentMethod $method): Payment
     {
@@ -103,6 +107,7 @@ final class PaymentService
             $payment->status = $event->status;
             $payment->meta = ['webhook' => $event->raw];
             $sendDepositConfirmation = null;
+            $refreshDelivery = false;
             if ($event->status === PaymentRecordStatus::Succeeded) {
                 $payment->paid_at = now();
                 $order->amount_paid += $payment->amount;
@@ -121,11 +126,18 @@ final class PaymentService
                             'actor_id' => null,
                             'event_type' => ProductionEventType::DepositReceived,
                         ]);
+                        $this->transitions->initializeAfterDeposit($order);
                         $sendDepositConfirmation = $order->id;
                     }
                 } elseif ($payment->kind === PaymentKind::Balance) {
                     $order->payment_status = PaymentStatus::Paid;
                     $order->balance_paid_at = now();
+                    $order->productionEvents()->create([
+                        'order_item_id' => $order->items()->value('id'),
+                        'actor_id' => null,
+                        'event_type' => ProductionEventType::BalanceReceived,
+                    ]);
+                    $refreshDelivery = true;
                 }
             } elseif ($event->status === PaymentRecordStatus::Failed) {
                 $order->productionEvents()->create([
@@ -137,6 +149,9 @@ final class PaymentService
 
             $payment->save();
             $order->save();
+            if ($refreshDelivery) {
+                $this->transitions->refreshDeliveryReadiness($order);
+            }
 
             return $sendDepositConfirmation;
         });

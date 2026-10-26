@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CatalogController;
+use App\Http\Controllers\Admin\ProductionSheetController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\OrderController;
@@ -41,6 +42,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{order}/payments', [PaymentController::class, 'store'])->name('orders.payments');
         Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancel'])->name('orders.cancel');
+        Route::get('/orders/{order}/timeline', [OrderController::class, 'timeline'])->name('orders.timeline');
+    });
+
+    Route::prefix('admin')->middleware('role:admin,producer')->group(function () {
+        Route::get('/production-sheets', [ProductionSheetController::class, 'index']);
+        Route::get('/production-sheets/batches', [ProductionSheetController::class, 'batches']);
+        Route::get('/production-sheets/{item}', [ProductionSheetController::class, 'show'])->whereNumber('item');
+        Route::get('/production-sheets/{item}/print', [ProductionSheetController::class, 'print'])->whereNumber('item');
+        Route::patch('/production-sheets/{item}/checklist', [ProductionSheetController::class, 'checklist'])->whereNumber('item');
+        Route::post('/order-items/{item}/transition', [ProductionSheetController::class, 'transition'])->whereNumber('item');
+        Route::post('/order-items/{item}/attention', [ProductionSheetController::class, 'setAttention'])->whereNumber('item');
+        Route::delete('/order-items/{item}/attention', [ProductionSheetController::class, 'clearAttention'])->whereNumber('item');
+        Route::post('/order-items/{item}/qc-photos', [ProductionSheetController::class, 'qcPhotos'])->whereNumber('item');
     });
 
     Route::prefix('admin/catalog')->name('admin.catalog.')->group(function () {

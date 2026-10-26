@@ -15,7 +15,12 @@ class OrderPolicy
 
     public function view(User $user, Order $order): bool
     {
-        return $user->role === UserRole::Customer->value
-            && $order->user_id === $user->id;
+        return in_array($user->role, [UserRole::Admin->value, UserRole::Producer->value], true)
+            || ($user->role === UserRole::Customer->value && $order->user_id === $user->id);
+    }
+
+    public function update(User $user, Order $order): bool
+    {
+        return in_array($user->role, [UserRole::Admin->value, UserRole::Producer->value], true);
     }
 }

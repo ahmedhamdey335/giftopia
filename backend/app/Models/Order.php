@@ -44,6 +44,9 @@ class Order extends Model
         'accepted_terms_at',
         'gift_wrap',
         'gift_message',
+        'courier_name',
+        'courier_phone',
+        'courier_reference',
         'idempotency_key',
     ];
 
