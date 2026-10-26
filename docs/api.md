@@ -53,6 +53,9 @@ techniques, personalization choices, compatibility rules, and the
 `handmade_variation`, `refund_policy`, and `proof_auto_approval`
 expectation-copy keys. Options are
 grouped under `data.steps`.
+The `checkout` object contains launch delivery, fee, deposit, lead-time, claim
+window, and proof auto-approval settings. `catalog_version` is a stable catalog
+hash returned in the response and as the quoted `ETag` header.
 
 ### `POST /api/studio/validate`
 
@@ -93,7 +96,23 @@ Returns `201` with a `quote_id`, itemized `price_breakdown`, integer `total`,
 `ready_at`, and `expires_at`. `ready_at` is indicative; the production promise
 is seven days after deposit confirmation. Quotes expire after 30 minutes by default.
 Configuration errors return `422` with the compatibility violations.
-`inspiration_asset_ids` is not supported yet and is rejected.
+Optional `inspiration_asset_ids` may contain up to three owned or guest-uploaded
+asset UUIDs; they are included in the quote hash and attached to the order item
+at checkout.
+
+### `POST /api/studio/assets`
+
+Accepts `multipart/form-data` with a `files[]` array of up to three JPEG, PNG,
+or WebP images, each at most 5 MB. Authentication is optional. Images are
+re-encoded to strip metadata and bound dimensions, then stored on a private
+disk. The response includes an asset UUID and a signed file URL that expires
+after 15 minutes. Do not expose the private storage path.
+
+### `GET /api/assets/{asset}/file`
+
+Requires a valid temporary signature. Customers may read only their own assets;
+producer/admin accounts may read order assets. Guest inspiration uploads can
+be read via their signed capability URL.
 
 Example response:
 

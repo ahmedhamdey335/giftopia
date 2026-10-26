@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ColorSwatchRole;
 use App\Enums\InsertType;
 use App\Enums\OptionRuleAction;
+use App\Models\Asset;
 use App\Models\BaseItem;
 use App\Models\ColorSwatch;
 use App\Models\Font;
@@ -16,8 +17,8 @@ use App\Models\Quote;
 use App\Models\Technique;
 use App\Models\TextColor;
 use App\Models\User;
-use App\Services\Studio\LeadTimeEstimator;
 use App\Services\Studio\FixedLeadTimeEstimator;
+use App\Services\Studio\LeadTimeEstimator;
 use App\Services\Studio\PriceCalculator;
 use App\Services\Studio\SnapshotBuilder;
 use App\Services\Studio\StudioConfiguration;
@@ -232,7 +233,7 @@ class StudioQuoteTest extends TestCase
         $this->assertSame(5000, $response->json('data.price.total'));
     }
 
-    public function test_studio_request_limits_free_text_and_rejects_unimplemented_asset_ids(): void
+    public function test_studio_request_limits_free_text_and_validates_inspiration_asset_ids(): void
     {
         $this->postJson('/api/studio/validate', ['personalization_text' => str_repeat('x', 301)])
             ->assertUnprocessable()
@@ -240,9 +241,42 @@ class StudioQuoteTest extends TestCase
         $this->postJson('/api/studio/validate', ['note' => str_repeat('x', 301)])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['note']);
-        $this->postJson('/api/studio/validate', ['inspiration_asset_ids' => [1]])
+        $this->postJson('/api/studio/validate', ['inspiration_asset_ids' => ['00000000-0000-0000-0000-000000000000']])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['inspiration_asset_ids']);
+            ->assertJsonValidationErrors(['inspiration_asset_ids.0']);
+    }
+
+    public function test_owned_inspiration_assets_are_part_of_the_normalized_quote(): void
+    {
+        $user = User::factory()->create();
+        $asset = Asset::query()->create([
+            'kind' => 'inspiration',
+            'owner_user_id' => $user->id,
+            'disk' => 'private_assets',
+            'path' => 'inspiration/reference.png',
+            'mime' => 'image/png',
+            'size' => 100,
+            'original_name' => 'reference.png',
+        ]);
+        $configuration = $this->completeConfiguration()->normalizedConfiguration();
+        $configuration['inspiration_asset_ids'] = [$asset->id];
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/studio/quote', $configuration)
+            ->assertCreated();
+        $quote = Quote::query()->findOrFail($response->json('data.quote_id'));
+
+        $this->assertSame([$asset->id], $quote->configuration['inspiration_asset_ids']);
+        $this->assertSame(
+            hash(
+                'sha256',
+                json_encode(
+                    StudioConfiguration::fromArray($quote->configuration)->normalizedConfiguration(),
+                    JSON_THROW_ON_ERROR,
+                ),
+            ),
+            $quote->config_hash,
+        );
     }
 
     private function completeConfiguration(): StudioConfiguration

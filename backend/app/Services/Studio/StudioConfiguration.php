@@ -16,6 +16,7 @@ final class StudioConfiguration
 {
     /**
      * @param  Collection<int, Insert>  $inserts
+     * @param  list<string>  $inspirationAssetIds
      * @param  list<array{field: string, id: mixed}>  $unknown
      */
     public function __construct(
@@ -30,6 +31,7 @@ final class StudioConfiguration
         public readonly ?TextColor $textColor,
         public readonly ?string $personalizationText,
         public readonly ?string $personalizationNote,
+        public readonly array $inspirationAssetIds,
         public readonly array $unknown = [],
     ) {}
 
@@ -50,6 +52,12 @@ final class StudioConfiguration
         $note = isset($input['personalization_note']) || isset($input['note'])
             ? trim((string) ($input['personalization_note'] ?? $input['note']))
             : null;
+        $inspirationAssetIds = collect($input['inspiration_asset_ids'] ?? [])
+            ->filter(fn ($id): bool => is_string($id) && $id !== '')
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
         $unknown = [];
         $baseItem = self::find(BaseItem::class, $input, 'base_item_id', $unknown);
@@ -80,6 +88,7 @@ final class StudioConfiguration
             textColor: $textColor,
             personalizationText: $text === '' ? null : $text,
             personalizationNote: $note === '' ? null : $note,
+            inspirationAssetIds: $inspirationAssetIds,
             unknown: $unknown,
         );
     }
@@ -167,7 +176,7 @@ final class StudioConfiguration
      */
     public function normalizedConfiguration(): array
     {
-        return [
+        $configuration = [
             'base_item_id' => $this->baseItem?->id,
             'mold_id' => $this->mold?->id,
             'mood_id' => $this->mood?->id,
@@ -180,6 +189,12 @@ final class StudioConfiguration
             'personalization_text' => $this->personalizationText,
             'personalization_note' => $this->personalizationNote,
         ];
+
+        if ($this->inspirationAssetIds !== []) {
+            $configuration['inspiration_asset_ids'] = $this->inspirationAssetIds;
+        }
+
+        return $configuration;
     }
 
     public function cureHours(): int

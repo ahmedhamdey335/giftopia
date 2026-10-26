@@ -6,6 +6,7 @@ use App\Enums\ProductionEventType;
 use App\Enums\ProductionStatus;
 use App\Exceptions\CheckoutException;
 use App\Mail\OrderConfirmationMail;
+use App\Models\Asset;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Models\User;
@@ -138,7 +139,7 @@ final class CheckoutService
                     ];
                 }
 
-                $order->items()->create([
+                $orderItem = $order->items()->create([
                     'mood_id' => $configuration->mood?->id,
                     'technique_id' => $configuration->technique?->id,
                     'has_text' => $configuration->hasPersonalization(),
@@ -147,6 +148,25 @@ final class CheckoutService
                     'production_status' => ProductionStatus::Placed,
                     'customization' => $customization,
                 ]);
+                if ($configuration->inspirationAssetIds !== []) {
+                    $assets = Asset::query()
+                        ->whereIn('id', $configuration->inspirationAssetIds)
+                        ->lockForUpdate()
+                        ->get();
+                    if ($assets->count() !== count($configuration->inspirationAssetIds)
+                        || $assets->contains(fn (Asset $asset): bool => $asset->kind !== 'inspiration'
+                            || $asset->attached_at !== null
+                            || ($asset->owner_user_id !== null && $asset->owner_user_id !== $user->id))) {
+                        throw new CheckoutException('An inspiration image is no longer available.', 422, [
+                            'inspiration_asset_ids' => ['Remove unavailable images and request a new quote.'],
+                        ]);
+                    }
+
+                    Asset::query()->whereIn('id', $configuration->inspirationAssetIds)->update([
+                        'order_item_id' => $orderItem->id,
+                        'attached_at' => $acceptedAt,
+                    ]);
+                }
                 $order->productionEvents()->create([
                     'actor_id' => $user->id,
                     'event_type' => ProductionEventType::Placed,

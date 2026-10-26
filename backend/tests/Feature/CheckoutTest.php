@@ -9,6 +9,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\ProductionEventType;
 use App\Enums\ProductionStatus;
 use App\Mail\OrderConfirmationMail;
+use App\Models\Asset;
 use App\Models\BaseItem;
 use App\Models\ColorSwatch;
 use App\Models\Font;
@@ -181,6 +182,38 @@ class CheckoutTest extends TestCase
         $response->assertJsonPath('data.shipping.city', 'tAnTa')
             ->assertJsonPath('data.shipping.governorate', 'gHaRbIa')
             ->assertJsonPath('data.shipping.country', 'Egypt');
+    }
+
+    public function test_checkout_attaches_quoted_inspiration_assets_to_the_order_item(): void
+    {
+        $user = User::factory()->create();
+        [$originalQuote, $configuration] = $this->makeQuote($user);
+        $asset = Asset::query()->create([
+            'kind' => 'inspiration',
+            'owner_user_id' => $user->id,
+            'disk' => 'private_assets',
+            'path' => 'inspiration/checkout.png',
+            'mime' => 'image/png',
+            'size' => 100,
+            'original_name' => 'checkout.png',
+        ]);
+        $withAsset = StudioConfiguration::fromArray([
+            ...$configuration->normalizedConfiguration(),
+            'inspiration_asset_ids' => [$asset->id],
+        ]);
+        $quote = app(StudioQuoteService::class)->create($withAsset, $user);
+        $payload = $this->checkoutPayload($quote);
+
+        $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'attach-inspiration')
+            ->postJson('/api/checkout', $payload)
+            ->assertCreated();
+
+        $item = Order::query()->firstOrFail()->items->firstOrFail();
+        $this->assertSame($item->id, $asset->fresh()->order_item_id);
+        $this->assertNotNull($asset->fresh()->attached_at);
+        $this->assertSame([$asset->id], $item->customization['inspiration_assets']);
+        $this->assertNotSame($originalQuote->config_hash, $quote->config_hash);
     }
 
     public function test_price_drift_returns_a_fresh_quote_for_reconfirmation(): void

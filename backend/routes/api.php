@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\CatalogController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AssetController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\StudioController;
 use App\Support\CatalogRegistry;
@@ -16,7 +17,14 @@ Route::prefix('studio')->name('studio.')->middleware('throttle:30,1')->group(fun
     Route::post('/quote', [StudioController::class, 'quote'])
         ->middleware('optional-auth')
         ->name('quote');
+    Route::post('/assets', [AssetController::class, 'store'])
+        ->middleware(['optional-auth', 'throttle:10,1'])
+        ->name('assets.store');
 });
+
+Route::get('/assets/{asset}/file', [AssetController::class, 'file'])
+    ->middleware('signed')
+    ->name('assets.file');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

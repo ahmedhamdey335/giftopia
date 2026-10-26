@@ -73,6 +73,7 @@ final class SnapshotBuilder
                 ] : null,
                 'note' => $config->personalizationNote,
             ],
+            'inspiration_assets' => $config->inspirationAssetIds,
             'price' => [
                 'breakdown' => $price['items'],
                 'total' => (int) $price['total'],

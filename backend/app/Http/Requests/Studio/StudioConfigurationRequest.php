@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Studio;
 
+use App\Models\Asset;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StudioConfigurationRequest extends FormRequest
@@ -27,7 +29,23 @@ class StudioConfigurationRequest extends FormRequest
             'personalization_text' => ['nullable', 'string', 'max:300'],
             'personalization_note' => ['nullable', 'string', 'max:300'],
             'note' => ['nullable', 'string', 'max:300'],
-            'inspiration_asset_ids' => ['prohibited'],
+            'inspiration_asset_ids' => ['sometimes', 'array', 'max:3'],
+            'inspiration_asset_ids.*' => [
+                'required',
+                'uuid',
+                'distinct',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $asset = is_string($value) ? Asset::query()->find($value) : null;
+                    $ownerId = $this->user()?->getAuthIdentifier();
+
+                    if ($asset === null
+                        || $asset->kind !== 'inspiration'
+                        || $asset->attached_at !== null
+                        || ($asset->owner_user_id !== null && $asset->owner_user_id !== $ownerId)) {
+                        $fail('The selected inspiration asset is unavailable.');
+                    }
+                },
+            ],
         ];
     }
 }
