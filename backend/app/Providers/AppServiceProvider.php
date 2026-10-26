@@ -15,8 +15,8 @@ use App\Models\User;
 use App\Policies\OrderPolicy;
 use App\Services\Payments\CashOnDeliveryGateway;
 use App\Services\Payments\PaymentGateway;
+use App\Services\Studio\FixedLeadTimeEstimator;
 use App\Services\Studio\LeadTimeEstimator;
-use App\Services\Studio\WorkingDayLeadTimeEstimator;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -25,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(LeadTimeEstimator::class, WorkingDayLeadTimeEstimator::class);
+        $this->app->bind(LeadTimeEstimator::class, FixedLeadTimeEstimator::class);
         $this->app->bind(PaymentGateway::class, CashOnDeliveryGateway::class);
     }
 

@@ -17,9 +17,11 @@ use App\Models\Technique;
 use App\Models\TextColor;
 use App\Models\User;
 use App\Services\Studio\LeadTimeEstimator;
+use App\Services\Studio\FixedLeadTimeEstimator;
 use App\Services\Studio\PriceCalculator;
 use App\Services\Studio\SnapshotBuilder;
 use App\Services\Studio\StudioConfiguration;
+use App\Services\Studio\WorkingDayLeadTimeEstimator;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -69,7 +71,7 @@ class StudioQuoteTest extends TestCase
     {
         $base = BaseItem::factory()->create(['labor_minutes' => 60, 'cure_hours' => 0]);
         $configuration = StudioConfiguration::fromArray(['base_item_id' => $base->id]);
-        $estimator = app(LeadTimeEstimator::class);
+        $estimator = app(WorkingDayLeadTimeEstimator::class);
 
         $friday = $estimator->estimate($configuration, CarbonImmutable::parse('2026-10-16 11:00:00', 'Africa/Cairo'));
         $saturday = $estimator->estimate($configuration, CarbonImmutable::parse('2026-10-17 11:00:00', 'Africa/Cairo'));
@@ -82,7 +84,7 @@ class StudioQuoteTest extends TestCase
     {
         $base = BaseItem::factory()->create(['labor_minutes' => 120, 'cure_hours' => 24]);
         $configuration = StudioConfiguration::fromArray(['base_item_id' => $base->id]);
-        $readyAt = app(LeadTimeEstimator::class)->estimate(
+        $readyAt = app(WorkingDayLeadTimeEstimator::class)->estimate(
             $configuration,
             CarbonImmutable::parse('2026-10-15 16:00:00', 'Africa/Cairo'),
         );
@@ -94,12 +96,23 @@ class StudioQuoteTest extends TestCase
     {
         $base = BaseItem::factory()->create(['labor_minutes' => 30, 'cure_hours' => 48]);
         $configuration = StudioConfiguration::fromArray(['base_item_id' => $base->id]);
-        $readyAt = app(LeadTimeEstimator::class)->estimate(
+        $readyAt = app(WorkingDayLeadTimeEstimator::class)->estimate(
             $configuration,
             CarbonImmutable::parse('2026-10-18 10:00:00', 'Africa/Cairo'),
         );
 
         $this->assertSame('2026-10-21 10:30:00', $readyAt->format('Y-m-d H:i:s'));
+    }
+
+    public function test_customer_promise_is_a_fixed_seven_days_from_quote_creation(): void
+    {
+        $configuration = $this->completeConfiguration();
+        $start = CarbonImmutable::parse('2026-10-16 11:00:00', 'Africa/Cairo');
+        $readyAt = app(FixedLeadTimeEstimator::class)->estimate($configuration, $start);
+
+        $this->assertSame('2026-10-23 11:00:00', $readyAt->format('Y-m-d H:i:s'));
+        $this->assertInstanceOf(LeadTimeEstimator::class, app(LeadTimeEstimator::class));
+        $this->assertInstanceOf(FixedLeadTimeEstimator::class, app(LeadTimeEstimator::class));
     }
 
     public function test_snapshot_builder_contains_schema_version_and_named_priced_choices(): void

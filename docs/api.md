@@ -89,7 +89,8 @@ provided, the quote is associated with that customer.
 ```
 
 Returns `201` with a `quote_id`, itemized `price_breakdown`, integer `total`,
-`ready_at`, and `expires_at`. Quotes expire after 30 minutes by default.
+`ready_at`, and `expires_at`. `ready_at` is indicative; the production promise
+is seven days after deposit confirmation. Quotes expire after 30 minutes by default.
 Configuration errors return `422` with the compatibility violations.
 `inspiration_asset_ids` is not supported yet and is rejected.
 

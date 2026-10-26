@@ -5,6 +5,18 @@ return [
     'daily_capacity_minutes' => (int) env('STUDIO_DAILY_CAPACITY_MINUTES', 480),
     'packing_buffer_hours' => (int) env('STUDIO_PACKING_BUFFER_HOURS', 24),
     'timezone' => env('STUDIO_TIMEZONE', 'Africa/Cairo'),
+    'delivery' => [
+        'cities' => ['Tanta', 'طنطا'],
+        'governorates' => ['Gharbia', 'الغربية'],
+        'fee' => (int) env('STUDIO_DELIVERY_FEE', 0),
+        'deposit_percent' => (int) env('STUDIO_DEPOSIT_PERCENT', 50),
+        'lead_time_days' => (int) env('STUDIO_LEAD_TIME_DAYS', 7),
+        'claim_window_days' => (int) env('STUDIO_CLAIM_WINDOW_DAYS', 3),
+        'proof_auto_approve_hours' => (int) env('STUDIO_PROOF_AUTO_APPROVE_HOURS', 48),
+        'deposit_hold_hours' => (int) env('STUDIO_DEPOSIT_HOLD_HOURS', 24),
+    ],
+    'deposit_percent' => (int) env('STUDIO_DEPOSIT_PERCENT', 50),
+    'lead_time_days' => (int) env('STUDIO_LEAD_TIME_DAYS', 7),
     // ISO-8601: 1 = Monday ... 7 = Sunday. Sunday–Thursday workshop week.
     'work_days' => [7, 1, 2, 3, 4],
     'work_start' => env('STUDIO_WORK_START', '09:00'),
