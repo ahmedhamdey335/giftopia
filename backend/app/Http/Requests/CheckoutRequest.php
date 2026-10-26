@@ -11,8 +11,17 @@ class CheckoutRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
+        $shipping = (array) $this->input('shipping', []);
+        foreach (['city', 'governorate'] as $field) {
+            if (isset($shipping[$field]) && is_string($shipping[$field])) {
+                $shipping[$field] = trim($shipping[$field]);
+            }
+        }
+        $shipping['country'] = $shipping['country'] ?? 'Egypt';
+
         $this->merge([
             'idempotency_key' => $this->header('Idempotency-Key'),
+            'shipping' => $shipping,
         ]);
     }
 
@@ -31,8 +40,26 @@ class CheckoutRequest extends FormRequest
             'shipping.phone' => ['required', 'string', 'max:32', 'regex:/^\\+?[0-9\\s().-]{7,32}$/'],
             'shipping.address_line1' => ['required', 'string', 'max:255'],
             'shipping.address_line2' => ['nullable', 'string', 'max:255'],
-            'shipping.city' => ['required', 'string', 'max:120'],
-            'shipping.governorate' => ['required', 'string', 'max:120'],
+            'shipping.city' => [
+                'required',
+                'string',
+                'max:120',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! $this->matchesConfiguredLocation($value, 'cities')) {
+                        $fail('Delivery is currently available only in Tanta, Gharbia.');
+                    }
+                },
+            ],
+            'shipping.governorate' => [
+                'required',
+                'string',
+                'max:120',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! $this->matchesConfiguredLocation($value, 'governorates')) {
+                        $fail('Delivery is currently available only in Tanta, Gharbia.');
+                    }
+                },
+            ],
             'shipping.postal_code' => ['nullable', 'string', 'max:20'],
             'shipping.country' => ['required', 'string', 'max:100'],
             'payment_method' => ['required', Rule::in(array_column(PaymentMethod::cases(), 'value'))],
@@ -52,5 +79,19 @@ class CheckoutRequest extends FormRequest
                 $fail('The acknowledgment must be accepted.');
             }
         };
+    }
+
+    private function matchesConfiguredLocation(mixed $value, string $setting): bool
+    {
+        if (! is_string($value)) {
+            return false;
+        }
+
+        $configured = array_map(
+            static fn (string $name): string => mb_strtolower(trim($name)),
+            (array) config('studio.delivery.'.$setting, []),
+        );
+
+        return in_array(mb_strtolower(trim($value)), $configured, true);
     }
 }

@@ -217,6 +217,10 @@ class StudioQuoteTest extends TestCase
         $this->assertCount(1, $response->json('data.steps.moods'));
         $this->assertSame($availableMood->id, $response->json('data.steps.moods.0.id'));
         $this->assertContains('handmade_variation', $response->json('data.expectation_copy_keys'));
+        $this->assertContains('refund_policy', $response->json('data.expectation_copy_keys'));
+        $this->assertNotEmpty($response->json('data.catalog_version'));
+        $this->assertSame('"'.$response->json('data.catalog_version').'"', $response->headers->get('ETag'));
+        $this->assertSame(7, $response->json('data.checkout.lead_time_days'));
     }
 
     public function test_validation_endpoint_returns_compatibility_and_a_partial_price(): void

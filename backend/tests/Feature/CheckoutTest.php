@@ -146,6 +146,41 @@ class CheckoutTest extends TestCase
         Mail::assertNothingQueued();
     }
 
+    public function test_checkout_rejects_delivery_outside_tanta(): void
+    {
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $payload = $this->checkoutPayload($quote);
+        $payload['shipping']['city'] = 'Cairo';
+
+        $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'outside-delivery-area')
+            ->postJson('/api/checkout', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['shipping.city']);
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_checkout_trims_and_matches_delivery_locations_case_insensitively(): void
+    {
+        $user = User::factory()->create();
+        [$quote] = $this->makeQuote($user);
+        $payload = $this->checkoutPayload($quote);
+        $payload['shipping']['city'] = '  tAnTa ';
+        $payload['shipping']['governorate'] = ' gHaRbIa ';
+        unset($payload['shipping']['country']);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('Idempotency-Key', 'trim-location')
+            ->postJson('/api/checkout', $payload)
+            ->assertCreated();
+
+        $response->assertJsonPath('data.shipping.city', 'tAnTa')
+            ->assertJsonPath('data.shipping.governorate', 'gHaRbIa')
+            ->assertJsonPath('data.shipping.country', 'Egypt');
+    }
+
     public function test_price_drift_returns_a_fresh_quote_for_reconfirmation(): void
     {
         Mail::fake();
@@ -341,8 +376,8 @@ class CheckoutTest extends TestCase
                 'phone' => '+201234567890',
                 'address_line1' => '10 Example Street',
                 'address_line2' => null,
-                'city' => 'Cairo',
-                'governorate' => 'Cairo',
+                'city' => 'Tanta',
+                'governorate' => 'Gharbia',
                 'postal_code' => '11511',
                 'country' => 'Egypt',
             ],
