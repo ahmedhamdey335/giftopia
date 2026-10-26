@@ -135,6 +135,21 @@ class CatalogFoundationTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
+    public function test_api_cors_allows_configured_frontend_and_checkout_headers(): void
+    {
+        config([
+            'cors.allowed_origins' => ['https://shop.example.test'],
+        ]);
+
+        $this->call('OPTIONS', '/api/studio/catalog', [], [], [], [
+            'HTTP_ORIGIN' => 'https://shop.example.test',
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
+            'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'authorization,content-type,idempotency-key',
+        ])->assertNoContent()
+            ->assertHeader('Access-Control-Allow-Origin', 'https://shop.example.test')
+            ->assertHeader('Access-Control-Allow-Headers', 'authorization, content-type, idempotency-key');
+    }
+
     public function test_admin_can_manage_catalog_but_customers_and_producers_are_restricted(): void
     {
         $item = BaseItem::factory()->create();
