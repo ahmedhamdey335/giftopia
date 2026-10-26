@@ -221,6 +221,10 @@ class StudioQuoteTest extends TestCase
         $this->assertContains('refund_policy', $response->json('data.expectation_copy_keys'));
         $this->assertNotEmpty($response->json('data.catalog_version'));
         $this->assertSame('"'.$response->json('data.catalog_version').'"', $response->headers->get('ETag'));
+        $this->withHeader('If-None-Match', $response->headers->get('ETag'))
+            ->get('/api/studio/catalog')
+            ->assertStatus(304)
+            ->assertHeader('ETag', $response->headers->get('ETag'));
         $this->assertSame(7, $response->json('data.checkout.lead_time_days'));
     }
 

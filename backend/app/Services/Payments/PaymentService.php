@@ -10,8 +10,10 @@ use App\Enums\PaymentStatus;
 use App\Enums\ProductionEventType;
 use App\Exceptions\CheckoutException;
 use App\Mail\OrderConfirmationMail;
+use App\Mail\OrderNoticeMail;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\Production\ProofService;
 use App\Services\Production\TransitionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +24,7 @@ final class PaymentService
     public function __construct(
         private readonly PaymentGateway $gateway,
         private readonly TransitionService $transitions,
+        private readonly ProofService $proofs,
     ) {}
 
     public function createAttempt(Order $order, PaymentKind $kind, PaymentMethod $method): Payment
@@ -89,7 +92,7 @@ final class PaymentService
         }
 
         $event = $this->gateway->parseWebhook($request);
-        $depositOrderId = DB::transaction(function () use ($provider, $event): ?int {
+        $mailOrder = DB::transaction(function () use ($provider, $event): ?array {
             $payment = Payment::query()
                 ->where('provider', $provider)
                 ->where('provider_reference', $event->reference)
@@ -107,6 +110,7 @@ final class PaymentService
             $payment->status = $event->status;
             $payment->meta = ['webhook' => $event->raw];
             $sendDepositConfirmation = null;
+            $sendBalanceConfirmation = false;
             $refreshDelivery = false;
             if ($event->status === PaymentRecordStatus::Succeeded) {
                 $payment->paid_at = now();
@@ -122,29 +126,28 @@ final class PaymentService
                     if ($order->status === OrderStatus::AwaitingDeposit) {
                         $order->status = OrderStatus::Confirmed;
                         $order->ready_by = now()->addDays((int) config('studio.delivery.lead_time_days', 7));
-                        $order->productionEvents()->create([
-                            'actor_id' => null,
-                            'event_type' => ProductionEventType::DepositReceived,
-                        ]);
+                        $this->transitions->recordOrderEvent($order, ProductionEventType::DepositReceived);
                         $this->transitions->initializeAfterDeposit($order);
+                        $this->proofs->createInitial($order);
                         $sendDepositConfirmation = $order->id;
                     }
                 } elseif ($payment->kind === PaymentKind::Balance) {
                     $order->payment_status = PaymentStatus::Paid;
                     $order->balance_paid_at = now();
-                    $order->productionEvents()->create([
-                        'order_item_id' => $order->items()->value('id'),
-                        'actor_id' => null,
-                        'event_type' => ProductionEventType::BalanceReceived,
-                    ]);
+                    $this->transitions->recordOrderEvent(
+                        $order,
+                        ProductionEventType::BalanceReceived,
+                        item: $order->items()->first(),
+                    );
+                    $sendBalanceConfirmation = true;
                     $refreshDelivery = true;
                 }
             } elseif ($event->status === PaymentRecordStatus::Failed) {
-                $order->productionEvents()->create([
-                    'actor_id' => null,
-                    'event_type' => ProductionEventType::PaymentFailed,
-                    'note' => 'Payment attempt failed.',
-                ]);
+                $this->transitions->recordOrderEvent(
+                    $order,
+                    ProductionEventType::PaymentFailed,
+                    'Payment attempt failed.',
+                );
             }
 
             $payment->save();
@@ -153,14 +156,26 @@ final class PaymentService
                 $this->transitions->refreshDeliveryReadiness($order);
             }
 
-            return $sendDepositConfirmation;
+            return [
+                'deposit' => $sendDepositConfirmation,
+                'balance' => $sendBalanceConfirmation ? $order->id : null,
+            ];
         });
 
-        if ($depositOrderId !== null) {
-            DB::afterCommit(static function () use ($depositOrderId): void {
-                $order = Order::query()->with(['items', 'user'])->findOrFail($depositOrderId);
-                Mail::to($order->user->email)
-                    ->queue((new OrderConfirmationMail($order))->afterCommit());
+        if ($mailOrder !== null) {
+            DB::afterCommit(static function () use ($mailOrder): void {
+                $depositOrderId = $mailOrder['deposit'];
+                if ($depositOrderId !== null) {
+                    $order = Order::query()->with(['items', 'user'])->findOrFail($depositOrderId);
+                    Mail::to($order->user->email)
+                        ->queue((new OrderConfirmationMail($order))->afterCommit());
+                }
+                $balanceOrderId = $mailOrder['balance'];
+                if ($balanceOrderId !== null) {
+                    $order = Order::query()->with('user')->findOrFail($balanceOrderId);
+                    Mail::to($order->user->email)
+                        ->queue((new OrderNoticeMail($order, 'balance_received'))->afterCommit());
+                }
             });
         }
 

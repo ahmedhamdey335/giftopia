@@ -8,6 +8,7 @@ use App\Http\Requests\CheckoutRequest;
 use App\Http\Resources\CustomerOrderResource;
 use App\Models\Order;
 use App\Services\Checkout\CheckoutService;
+use App\Services\ReorderService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -119,5 +120,22 @@ class OrderController extends Controller
             ->values();
 
         return ApiResponse::success(['events' => $events]);
+    }
+
+    public function reorder(Request $request, Order $order, ReorderService $reorders): JsonResponse
+    {
+        $this->authorize('view', $order);
+        $result = $reorders->create($order, $request->user());
+        if (! $result['allowed']) {
+            return ApiResponse::error('The previous design is no longer available as-is.', [
+                'issues' => $result['issues'],
+                'draft' => $result['draft'],
+            ], 422);
+        }
+
+        return ApiResponse::success([
+            'quote' => $result['quote'],
+            'draft' => $result['draft'],
+        ], 'Reorder design quoted.', 201);
     }
 }

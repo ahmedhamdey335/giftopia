@@ -19,6 +19,7 @@ final class SnapshotBuilder
                 'name' => $config->baseItem->name,
                 'piece_count' => $config->baseItem->piece_count,
                 'price' => $config->baseItem->base_price,
+                'max_text_chars' => $config->baseItem->max_text_chars,
                 'mold' => $config->mold ? [
                     'id' => $config->mold->id,
                     'name' => $config->mold->name,

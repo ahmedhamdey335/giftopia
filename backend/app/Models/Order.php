@@ -39,6 +39,7 @@ class Order extends Model
         'deposit_paid_at',
         'balance_paid_at',
         'delivered_at',
+        'ready_for_delivery_at',
         'deposit_expires_at',
         'cancelled_at',
         'accepted_terms_at',
@@ -66,6 +67,7 @@ class Order extends Model
             'deposit_paid_at' => 'datetime',
             'balance_paid_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'ready_for_delivery_at' => 'datetime',
             'deposit_expires_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'accepted_terms_at' => 'datetime',
@@ -91,5 +93,10 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function refundRequests(): HasMany
+    {
+        return $this->hasMany(RefundRequest::class);
     }
 }

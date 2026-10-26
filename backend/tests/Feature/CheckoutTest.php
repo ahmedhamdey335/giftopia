@@ -396,7 +396,7 @@ class CheckoutTest extends TestCase
 
         $this->call('POST', '/api/payments/webhook/fake', [], [], [], $headers, $body)->assertOk();
         $this->assertSame($payment->amount, $order->fresh()->amount_paid);
-        $this->assertDatabaseCount('production_events', 2);
+        $this->assertDatabaseCount('production_events', 3);
         Mail::assertQueued(OrderConfirmationMail::class, 1);
     }
 

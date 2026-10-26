@@ -71,8 +71,9 @@ final class ProductionSheetService
             ->values()
             ->all();
         $personalization = (array) ($snapshot['personalization'] ?? []);
+        $approvedProof = $item->proofs()->where('status', ProofStatus::Approved->value)->latest('version')->first();
         $text = $item->proof_status === ProofStatus::Approved
-            ? ($personalization['text'] ?? null)
+            ? ($approvedProof?->text ?? ($personalization['text'] ?? null))
             : null;
 
         return [
@@ -94,7 +95,7 @@ final class ProductionSheetService
             'inserts' => $inserts,
             'text' => $text === null ? null : [
                 'value' => strip_tags((string) $text),
-                'proof_version' => null,
+                'proof_version' => $approvedProof?->version,
             ],
             'customer_note' => isset($personalization['note']) ? strip_tags((string) $personalization['note']) : null,
             'references' => $references,

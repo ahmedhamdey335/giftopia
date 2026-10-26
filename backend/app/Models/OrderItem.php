@@ -27,6 +27,9 @@ class OrderItem extends Model
         'qc_at',
         'packed_at',
         'actual_labor_minutes',
+        'planned_start',
+        'planned_finish',
+        'schedule_allocations',
         'customization',
     ];
 
@@ -45,6 +48,9 @@ class OrderItem extends Model
             'qc_at' => 'datetime',
             'packed_at' => 'datetime',
             'actual_labor_minutes' => 'integer',
+            'planned_start' => 'datetime',
+            'planned_finish' => 'datetime',
+            'schedule_allocations' => 'array',
             'customization' => 'array',
         ];
     }
@@ -57,5 +63,10 @@ class OrderItem extends Model
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);
+    }
+
+    public function proofs(): HasMany
+    {
+        return $this->hasMany(Proof::class);
     }
 }

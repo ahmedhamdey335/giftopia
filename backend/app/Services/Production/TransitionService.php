@@ -10,6 +10,7 @@ use App\Enums\ProofStatus;
 use App\Enums\UserRole;
 use App\Exceptions\CheckoutException;
 use App\Mail\BalanceRequestedMail;
+use App\Mail\OrderNoticeMail;
 use App\Models\Asset;
 use App\Models\ColorSwatch;
 use App\Models\Insert;
@@ -174,6 +175,33 @@ final class TransitionService
         });
     }
 
+    public function recordEvent(
+        OrderItem $item,
+        ProductionEventType $eventType,
+        string $from,
+        string $to,
+        ?string $note,
+        ?User $actor = null,
+    ): ProductionEvent {
+        return $this->record($item, $from, $to, $actor, $note, $eventType);
+    }
+
+    public function recordOrderEvent(
+        Order $order,
+        ProductionEventType $eventType,
+        ?string $note = null,
+        ?User $actor = null,
+        ?OrderItem $item = null,
+    ): ProductionEvent {
+        return ProductionEvent::query()->create([
+            'order_id' => $order->id,
+            'order_item_id' => $item?->id,
+            'actor_id' => $actor?->id,
+            'event_type' => $eventType,
+            'note' => $note,
+        ]);
+    }
+
     public function refreshDeliveryReadiness(Order $order, ?User $actor = null): void
     {
         $order->refresh();
@@ -191,6 +219,9 @@ final class TransitionService
         }
 
         $order->status = $to;
+        if ($to === OrderStatus::ReadyForDelivery) {
+            $order->ready_for_delivery_at = now();
+        }
         $order->save();
         $eventType = $to === OrderStatus::AwaitingBalance
             ? ProductionEventType::BalanceRequested
@@ -313,6 +344,13 @@ final class TransitionService
                 ? ProductionEventType::OutForDelivery
                 : ProductionEventType::Delivered;
             $this->record($locked, $from, $to, $actor, $options['note'] ?? null, $eventType);
+            $orderId = $order->id;
+            $notice = $to === OrderStatus::OutForDelivery->value ? 'out_for_delivery' : 'delivered';
+            DB::afterCommit(static function () use ($orderId, $notice): void {
+                $deliveryOrder = Order::query()->with('user')->findOrFail($orderId);
+                Mail::to($deliveryOrder->user->email)
+                    ->queue((new OrderNoticeMail($deliveryOrder, $notice))->afterCommit());
+            });
 
             return $locked->fresh(['order']);
         });

@@ -305,3 +305,161 @@ PATCH /api/admin/catalog/inserts/{id}/availability
 It accepts only `{"is_available": false}`. Base items and moods use
 `{"is_active": false}`; color swatches use `is_available`. Producers cannot
 change catalog prices or other fields.
+
+## Production workflow
+
+Producer and admin endpoints require a bearer token. Customers receive `403`
+for production-sheet routes. Production cards include only the data needed to
+make and deliver an item; producer responses omit payment records and amounts.
+
+### `GET /api/admin/production-sheets`
+
+Query parameters: `view` (`today`, `waiting`, `needs_attention`, `shipping`,
+`all`), optional `status`, `due_from`, `due_to`, `q`, `page`, and `per_page`.
+The response contains cards, computed attention reasons, and pagination.
+`today` includes `ready_to_start`, `in_production`, and `qc`; `waiting` means
+`awaiting_proof`; `shipping` includes packed items with orders awaiting
+balance, ready for delivery, or out for delivery.
+
+### `GET /api/admin/production-sheets/{item}`
+
+Returns one production card built from the stored order snapshot, including
+approved personalization text and proof version only, material availability,
+the persisted checklist, signed reference URLs, delivery details, computed
+attention reasons, and allowed next transitions.
+
+### `PATCH /api/admin/production-sheets/{item}/checklist`
+
+Accepts `{"checks":{"steps":{"mix":true},"materials":{"swatch-8":true}}}`.
+Unknown step/material keys return `422`; checks are persisted per item.
+
+### `POST /api/admin/order-items/{item}/transition`
+
+Accepts a destination `to`, optional `note`, `override`, QC `asset_ids`,
+`actual_labor_minutes`, and courier fields. Production destinations are
+`ready_to_start`, `in_production`, `curing`, `qc`, and `packed`; delivery
+destinations are `out_for_delivery` and `delivered`. Illegal transitions return
+`422` with `allowed_next_states`. Initial states are system-managed after
+deposit success. Starting production checks current material availability; QC
+waits for cure time unless an admin provides `override: true` and a note;
+packing requires an attached QC photo. Packing all items moves an order to
+`awaiting_balance`. Delivery requires the balance to be paid.
+
+### Attention and QC endpoints
+
+- `POST /api/admin/order-items/{item}/attention`: body `{"note":"..."}`; sets a
+  manual attention flag.
+- `DELETE /api/admin/order-items/{item}/attention`: clears the manual flag.
+- `POST /api/admin/order-items/{item}/qc-photos`: multipart `files[]`, maximum
+  three JPEG/PNG/WebP images, each at most 5 MB. Returns asset UUIDs and
+  signed links for the transition request.
+- `GET /api/admin/production-sheets/batches`: groups ready-to-start items by
+  base pigment and mold.
+- `GET /api/admin/production-sheets/{item}/print`: returns escaped,
+  print-friendly HTML without prices.
+
+### `GET /api/orders/{order}/timeline`
+
+Customer owner only. Returns customer-safe milestones (deposit, proof,
+balance, delivery, and refund events); internal production notes are omitted.
+
+## Proofs, calendar, refunds, and reorder
+
+### Customer proof endpoints
+
+- `GET /api/orders/{order}/proof`: customer owner only; returns proof versions,
+  text, font/color names, status, response deadline, and optional signed
+  preview URLs.
+- `POST /api/orders/{order}/proof/approve`: customer owner only; approves the
+  pending proof(s) on the order.
+- `POST /api/orders/{order}/proof/request-changes`: customer owner only; body
+  `{"note":"Please use a shorter line."}`. A note is required.
+- `POST /api/admin/order-items/{item}/proof/revise`: producer/admin only; body
+  `{"text":"For Sara!","note":"Updated punctuation"}`. Font and text color
+  remain fixed to the first proof.
+
+The first proof is created after the deposit is confirmed. A pending proof is
+reminded after 24 hours and auto-approved after
+`STUDIO_PROOF_AUTO_APPROVE_HOURS` (default 48). A revision increments its
+version and resets the approval timer.
+
+### Calendar and blackout dates
+
+- `GET /api/admin/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD`: daily load,
+  capacity, scheduled items, items due, and blackout dates (maximum range 366
+  days).
+- `GET /api/admin/blackout-dates`: lists workshop blackout dates.
+- `POST /api/admin/blackout-dates`: create with `date` and optional `reason`.
+- `PUT` or `PATCH /api/admin/blackout-dates/{blackoutDate}`: update those
+  fields.
+- `DELETE /api/admin/blackout-dates/{blackoutDate}`: remove a blackout.
+
+Calendar and blackout routes are producer/admin only. Scheduling uses the
+single configured daily capacity and skips non-working and blackout dates;
+the seven-day customer promise is unchanged when an item is at risk.
+
+### Reorder
+
+`POST /api/orders/{order}/reorder` requires the customer owner. It validates
+the previous option IDs against the current catalog and returns `201` with
+`{"quote":...,"draft":...}` on success. Inspiration photos are not copied.
+Unavailable or invalid choices return `422` with `errors.issues` and an
+editable `errors.draft`.
+
+### Refunds
+
+- `POST /api/refund-evidence`: customer token; multipart `order_id` and up to
+  three `files[]` images (5 MB each). Returns private asset UUIDs.
+- `POST /api/orders/{order}/refund-requests`: customer owner; body
+  `{"reason":"...","evidence_asset_ids":["uuid"]}`. Reason length is 10–1000
+  characters. One open claim is allowed. Delivered orders must be within
+  `STUDIO_CLAIM_WINDOW_DAYS` (default 3).
+- `GET /api/orders/{order}/refund-requests`: customer owner; lists that order's
+  claims.
+- `GET /api/admin/refund-requests?status=requested`: producer/admin; filters
+  by status and includes signed evidence, approved-proof references, and QC
+  photos.
+- `POST /api/admin/refund-requests/{id}/approve`: producer/admin; optional
+  `approved_amount` and `note`. The amount cannot exceed the amount paid.
+  Provider failures remain visible as `failed` and are retryable.
+- `POST /api/admin/refund-requests/{id}/reject`: producer/admin; requires
+  `{"note":"..."}`.
+
+Refund photo evidence is private and signed. Staff request notifications are
+queued when `STUDIO_STAFF_EMAIL` is configured.
+
+## Studio funnel and admin reports
+
+### `POST /api/studio/events`
+
+Guest or authenticated client; throttled to 60 requests/minute. Accepts up to
+20 events per batch:
+
+```json
+{"events":[{"session_id":"2e781ddb-3a10-4a2d-939f-2d203a1bf923","step":1,"event":"viewed"}]}
+```
+
+`step` is 1–6; `event` is `viewed`, `completed`, or `abandoned` and defaults
+to `viewed`. No user identity or personal data is accepted. Returns `202`.
+
+### Admin reports
+
+- `GET /api/admin/reports/overview?from=YYYY-MM-DD&to=YYYY-MM-DD`: admin-only
+  funnel, deposit, proof, on-time, refund, and production-duration metrics.
+- `GET /api/admin/reports/estimates?from=YYYY-MM-DD&to=YYYY-MM-DD`: admin-only
+  estimated-vs-actual labor by base item and technique, with configurable
+  sample and variance thresholds.
+- `php artisan giftopia:report`: prints the current-month overview.
+
+The report period defaults to the current month and cannot exceed 366 days.
+Empty periods return zero rates and durations rather than division errors.
+
+## Error contract and statuses
+
+Validation errors use HTTP `422` and the common envelope, with field-specific
+messages in `errors`. Authorization failures are `401`/`403`; missing records
+are `404`; conflicting open claims are `409`; rate limits are `429`. Customer
+order statuses are `awaiting_deposit`, `confirmed`, `awaiting_balance`,
+`ready_for_delivery`, `out_for_delivery`, `delivered`, `cancelled`, and
+`refunded`. Item production statuses are `placed`, `awaiting_proof`,
+`ready_to_start`, `in_production`, `curing`, `qc`, and `packed`.

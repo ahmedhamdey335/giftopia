@@ -51,6 +51,7 @@ class CustomerOrderResource extends JsonResource
                 'id' => $item->id,
                 'name' => strip_tags((string) ($item->customization['base_item']['name'] ?? 'Custom handmade item')),
                 'unit_price' => $item->unit_price,
+                'proof_status' => $item->proof_status->value,
                 'customization' => $this->customerCustomization($item->customization),
             ])->values(),
             'created_at' => $this->created_at->toIso8601String(),

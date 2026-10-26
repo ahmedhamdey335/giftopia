@@ -4,6 +4,11 @@ return [
     'quote_ttl_minutes' => (int) env('STUDIO_QUOTE_TTL_MINUTES', 30),
     'daily_capacity_minutes' => (int) env('STUDIO_DAILY_CAPACITY_MINUTES', 480),
     'packing_buffer_hours' => (int) env('STUDIO_PACKING_BUFFER_HOURS', 24),
+    'staff_email' => env('STUDIO_STAFF_EMAIL', ''),
+    'reporting' => [
+        'minimum_samples' => (int) env('STUDIO_REPORT_MINIMUM_SAMPLES', 20),
+        'variance_threshold_percent' => (float) env('STUDIO_REPORT_VARIANCE_THRESHOLD_PERCENT', 15),
+    ],
     'timezone' => env('STUDIO_TIMEZONE', 'Africa/Cairo'),
     'delivery' => [
         'cities' => ['Tanta', 'طنطا'],

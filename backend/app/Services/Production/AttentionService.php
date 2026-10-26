@@ -7,10 +7,14 @@ use App\Enums\PaymentRecordStatus;
 use App\Enums\ProductionStatus;
 use App\Enums\ProofStatus;
 use App\Models\OrderItem;
+use App\Services\Studio\ProductionFeasibilityChecker;
 
 final class AttentionService
 {
-    public function __construct(private readonly TransitionService $transitions) {}
+    public function __construct(
+        private readonly TransitionService $transitions,
+        private readonly ProductionFeasibilityChecker $feasibility,
+    ) {}
 
     /**
      * @return list<array{code: string, note: ?string}>
@@ -38,13 +42,17 @@ final class AttentionService
             $reasons[] = ['code' => 'overdue', 'note' => null];
         }
 
-        $plannedFinish = $item->getAttribute('planned_finish');
-        if ($plannedFinish !== null && $item->order->ready_by->lt($plannedFinish)) {
+        if ($this->feasibility->isAtRisk($item)) {
             $reasons[] = ['code' => 'at_risk', 'note' => null];
         }
 
-        if ($item->order->payments()->where('status', PaymentRecordStatus::Failed->value)->exists()) {
+        if ($item->order->payments()->where('status', PaymentRecordStatus::Failed->value)
+            ->whereIn('kind', ['deposit', 'balance'])->exists()) {
             $reasons[] = ['code' => 'payment_problem', 'note' => null];
+        }
+
+        if ($item->order->refundRequests()->whereIn('status', ['requested', 'failed'])->exists()) {
+            $reasons[] = ['code' => 'refund_request', 'note' => null];
         }
 
         if ($item->needs_attention) {

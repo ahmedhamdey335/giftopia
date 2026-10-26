@@ -40,4 +40,9 @@ class Asset extends Model
     {
         return $this->belongsTo(OrderItem::class);
     }
+
+    public function refundRequest(): BelongsTo
+    {
+        return $this->belongsTo(RefundRequest::class);
+    }
 }

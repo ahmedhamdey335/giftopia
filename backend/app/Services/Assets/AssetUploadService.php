@@ -37,6 +37,15 @@ final class AssetUploadService
      * @param  list<UploadedFile>  $files
      * @return list<Asset>
      */
+    public function uploadRefundEvidence(array $files, User $owner): array
+    {
+        return $this->store($files, $owner, 'refund_evidence');
+    }
+
+    /**
+     * @param  list<UploadedFile>  $files
+     * @return list<Asset>
+     */
     private function store(array $files, ?User $owner, string $kind, ?OrderItem $item = null): array
     {
         $storedPaths = [];
