@@ -12,5 +12,9 @@
     <p>Total: {{ $total }}</p>
     <p>Ready by: {{ $readyDate }}</p>
     <p>{{ $handmadeVariationNote }}</p>
+    <p>{{ $refundPolicyNote }}</p>
+    @if ($proofAutoApprovalNote)
+        <p>{{ $proofAutoApprovalNote }}</p>
+    @endif
 </body>
 </html>

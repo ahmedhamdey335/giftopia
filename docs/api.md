@@ -50,7 +50,8 @@ All studio endpoints are throttled.
 
 Returns active base items and moods, their molds, available colors and inserts,
 techniques, personalization choices, compatibility rules, and the
-`handmade_variation` / `non_returnable` expectation-copy keys. Options are
+`handmade_variation`, `refund_policy`, and `proof_auto_approval`
+expectation-copy keys. Options are
 grouped under `data.steps`.
 
 ### `POST /api/studio/validate`
@@ -152,7 +153,8 @@ Content-Type: application/json
   },
   "acknowledgments": {
     "handmade_variation": true,
-    "non_returnable": true
+    "refund_policy": true,
+    "proof_auto_approval": true
   }
 }
 ```

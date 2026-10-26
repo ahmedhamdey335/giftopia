@@ -62,6 +62,8 @@ class CheckoutTest extends TestCase
         $this->assertSame(1, $item->customization['schema_version']);
         $this->assertTrue($item->customization['acknowledgments']['handmade_variation']['accepted']);
         $this->assertNotNull($item->customization['acknowledgments']['handmade_variation']['accepted_at']);
+        $this->assertTrue($item->customization['acknowledgments']['refund_policy']['accepted']);
+        $this->assertTrue($item->customization['acknowledgments']['proof_auto_approval']['accepted']);
         $this->assertSame(ProductionEventType::Placed, $order->productionEvents->first()->event_type);
         $this->assertNotNull($quote->fresh()->used_at);
 
@@ -249,13 +251,13 @@ class CheckoutTest extends TestCase
         $user = User::factory()->create();
         [$quote] = $this->makeQuote($user);
         $payload = $this->checkoutPayload($quote);
-        unset($payload['acknowledgments']['non_returnable']);
+        unset($payload['acknowledgments']['refund_policy']);
 
         $this->actingAs($user, 'sanctum')
             ->withHeader('Idempotency-Key', 'missing-ack')
             ->postJson('/api/checkout', $payload)
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['acknowledgments.non_returnable']);
+            ->assertJsonValidationErrors(['acknowledgments.refund_policy']);
 
         $this->assertDatabaseCount('orders', 0);
         Mail::assertNothingQueued();
@@ -388,7 +390,8 @@ class CheckoutTest extends TestCase
             ],
             'acknowledgments' => [
                 'handmade_variation' => true,
-                'non_returnable' => true,
+                'refund_policy' => true,
+                'proof_auto_approval' => true,
             ],
         ];
     }

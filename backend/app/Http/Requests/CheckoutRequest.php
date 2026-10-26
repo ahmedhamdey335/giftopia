@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\PaymentMethod;
+use App\Models\Quote;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -68,7 +69,11 @@ class CheckoutRequest extends FormRequest
             'gift_options.gift_message' => ['nullable', 'string', 'max:500'],
             'acknowledgments' => ['required', 'array'],
             'acknowledgments.handmade_variation' => ['required', $this->mustBeTrue()],
-            'acknowledgments.non_returnable' => ['required', $this->mustBeTrue()],
+            'acknowledgments.refund_policy' => ['required', $this->mustBeTrue()],
+            'acknowledgments.proof_auto_approval' => [
+                Rule::requiredIf(fn (): bool => $this->quoteHasPersonalization()),
+                $this->mustBeTrue(),
+            ],
         ];
     }
 
@@ -93,5 +98,17 @@ class CheckoutRequest extends FormRequest
         );
 
         return in_array(mb_strtolower(trim($value)), $configured, true);
+    }
+
+    private function quoteHasPersonalization(): bool
+    {
+        $quoteId = $this->input('quote_id');
+        if (! is_string($quoteId)) {
+            return false;
+        }
+
+        $quote = Quote::query()->find($quoteId);
+
+        return filled($quote?->configuration['personalization_text'] ?? null);
     }
 }

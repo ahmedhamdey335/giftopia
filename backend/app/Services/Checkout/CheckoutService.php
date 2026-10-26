@@ -126,11 +126,17 @@ final class CheckoutService
                         'accepted' => true,
                         'accepted_at' => $acceptedAt->toIso8601String(),
                     ],
-                    'non_returnable' => [
+                    'refund_policy' => [
                         'accepted' => true,
                         'accepted_at' => $acceptedAt->toIso8601String(),
                     ],
                 ];
+                if ($configuration->hasPersonalization()) {
+                    $customization['acknowledgments']['proof_auto_approval'] = [
+                        'accepted' => true,
+                        'accepted_at' => $acceptedAt->toIso8601String(),
+                    ];
+                }
 
                 $order->items()->create([
                     'mood_id' => $configuration->mood?->id,

@@ -43,6 +43,10 @@ class OrderConfirmationMail extends Mailable implements ShouldQueue
                     ->setTimezone((string) config('studio.timezone', 'Africa/Cairo'))
                     ->format('F j, Y'),
                 'handmadeVariationNote' => 'Each piece is handmade, so slight variations in color and detail are part of its character.',
+                'refundPolicyNote' => 'If your piece does not match the approved design, contact us with a reason within '.(int) config('studio.delivery.claim_window_days', 3).' days of delivery. Photos are optional evidence.',
+                'proofAutoApprovalNote' => $this->order->items->contains('has_text')
+                    ? 'Text proofs are automatically approved after '.(int) config('studio.delivery.proof_auto_approve_hours', 48).' hours without a response.'
+                    : null,
             ],
         );
     }
