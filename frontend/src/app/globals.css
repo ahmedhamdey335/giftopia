@@ -1,0 +1,128 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Giftopia theme: warm nude / earthy neutrals with bronze and soft-gold accents.
+ * Tailwind v4 is configured here (CSS-first), there is no tailwind.config.js.
+ * The shadcn variables below are overridden with the brand palette, so every shadcn component
+ * (button, input, card, dialog…) is on-brand automatically.
+ *
+ * Contrast (WCAG): text #3B2F2A on cream 12:1, muted text 5.2:1, primary button 8.2:1,
+ * input borders 3:1. Soft gold (#B8975F) is decorative only, never for text or focus rings.
+ */
+:root {
+  --radius: 0.875rem;
+
+  /* surfaces */
+  --background: #faf6f1; /* cream */
+  --foreground: #3b2f2a; /* espresso */
+  --card: #fffdf9; /* ivory */
+  --card-foreground: #3b2f2a;
+  --popover: #fffdf9;
+  --popover-foreground: #3b2f2a;
+
+  /* actions */
+  --primary: #5a4638; /* deep umber */
+  --primary-foreground: #faf6f1;
+  --secondary: #efe6db; /* sand */
+  --secondary-foreground: #3b2f2a;
+  --accent: #e8d5c4; /* nude */
+  --accent-foreground: #3b2f2a;
+
+  /* supporting */
+  --muted: #f3ece3;
+  --muted-foreground: #76655a;
+  --destructive: #a8462f; /* terracotta */
+  --border: #e3d6c6;
+  --input: #a08c76; /* 3:1 against cream so fields are clearly visible */
+  --ring: #8a6238; /* bronze focus ring */
+
+  /* brand-only tokens */
+  --bronze: #8a6238; /* text-safe accent (5:1) */
+  --gold: #b8975f; /* decorative: hairlines, icons, badges */
+  --sage: #4f7352; /* success */
+
+  --chart-1: #8a6238;
+  --chart-2: #b8975f;
+  --chart-3: #a08c76;
+  --chart-4: #4f7352;
+  --chart-5: #5a4638;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-bronze: var(--bronze);
+  --color-gold: var(--gold);
+  --color-sage: var(--sage);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --font-sans: var(--font-jost), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cormorant), ui-serif, Georgia, serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+  /* Respect people who ask for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Soft paper grain for hero/feature surfaces: organic texture without an image request. */
+  .surface-grain {
+    background-image:
+      radial-gradient(60rem 30rem at 15% -10%, rgb(232 213 196 / 0.55), transparent 60%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.27  0 0 0 0 0.2  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .hairline-gold {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+}
