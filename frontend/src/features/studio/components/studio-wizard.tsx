@@ -8,6 +8,7 @@ import { useFunnelTracking } from "../hooks/use-funnel-tracking";
 import { useStudioSession } from "../hooks/use-studio-session";
 import { useStudioValidation } from "../hooks/use-studio-validation";
 import { STEPS } from "../steps";
+import { resolveMoodPreset } from "../store/mappers";
 import { firstIncompleteStep, getStepStatus } from "../store/selectors";
 import { useStudioStore } from "../store/studio-store";
 
@@ -73,6 +74,7 @@ export function StudioWizard() {
   const setBaseItem = useStudioStore((state) => state.setBaseItem);
   const setMold = useStudioStore((state) => state.setMold);
   const setMood = useStudioStore((state) => state.setMood);
+  const applyMoodPreset = useStudioStore((state) => state.applyMoodPreset);
   const setTechnique = useStudioStore((state) => state.setTechnique);
   const setBaseColor = useStudioStore((state) => state.setBaseColor);
   const setAccentColor = useStudioStore((state) => state.setAccentColor);
@@ -153,7 +155,8 @@ export function StudioWizard() {
             </section>
           </div>
         );
-      case 2:
+      case 2: {
+        const selectedMood = selections.moodId === null ? undefined : index.moods.get(selections.moodId);
         return (
           <div className="space-y-6">
             <section className="space-y-3">
@@ -163,12 +166,21 @@ export function StudioWizard() {
                   <SelectionButton
                     key={mood.id}
                     selected={selections.moodId === mood.id}
-                    onClick={() => setMood(mood.id)}
+                    onClick={() => setMood(mood.id, resolveMoodPreset(catalog, mood))}
                   >
                     {mood.name}
                   </SelectionButton>
                 ))}
               </div>
+              {selectedMood && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => applyMoodPreset(resolveMoodPreset(catalog, selectedMood))}
+                >
+                  Use this mood&apos;s palette
+                </Button>
+              )}
             </section>
             <section className="space-y-3">
               <h2 className="text-2xl">Choose a technique</h2>
@@ -179,13 +191,18 @@ export function StudioWizard() {
                     selected={selections.techniqueId === technique.id}
                     onClick={() => setTechnique(technique.id)}
                   >
-                    {technique.name}
+                    <span className="block font-medium">{technique.name}</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Price difference {formatEgp(technique.price_delta)} ·{" "}
+                      {technique.requires_accent ? "Accent required" : "No accent required"}
+                    </span>
                   </SelectionButton>
                 ))}
               </div>
             </section>
           </div>
         );
+      }
       case 3:
         return (
           <div className="space-y-6">
