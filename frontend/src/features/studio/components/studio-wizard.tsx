@@ -267,15 +267,32 @@ export function StudioWizard() {
           <section className="space-y-3">
             <h2 className="text-2xl">Choose optional inserts</h2>
             <div className="grid gap-3 sm:grid-cols-2">
-              {catalog.steps.inserts.map((insert) => (
-                <SelectionButton
-                  key={insert.id}
-                  selected={selections.insertIds.includes(insert.id)}
-                  onClick={() => toggleInsert(insert.id)}
-                >
-                  {insert.name}
-                </SelectionButton>
-              ))}
+            {catalog.steps.inserts.map((insert) => {
+              const selected = selections.insertIds.includes(insert.id);
+              const blockedMessage = isOptionBlocked(validation.result, "insert", insert.id);
+              const unavailableMessage = insert.is_available ? null : `${insert.name} is currently unavailable.`;
+              const helperMessage = blockedMessage ?? unavailableMessage;
+              const helperId = `insert-help-${insert.id}`;
+              return (
+                <div key={insert.id}>
+                  <SelectionButton
+                    selected={selected}
+                    disabled={helperMessage !== null && !selected}
+                    describedBy={helperMessage ? helperId : undefined}
+                    onClick={() => toggleInsert(insert.id)}
+                  >
+                    <span className="block font-medium">{insert.name}</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      {insert.type}{insert.color ? ` · ${insert.color}` : ""} · Minimum depth {insert.min_depth_mm} mm
+                    </span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      {formatEgp(insert.price)} · {insert.labor_minutes} minutes
+                    </span>
+                  </SelectionButton>
+                  {helperMessage && <p id={helperId} className="mt-1 text-sm text-destructive">{helperMessage}</p>}
+                </div>
+              );
+            })}
             </div>
           </section>
         );
