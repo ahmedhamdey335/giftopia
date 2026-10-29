@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { errorMessage } from "@/lib/api/errors";
 import { formatEgp } from "@/lib/money";
+import { studioApi } from "../api/studio-api";
 import { useCatalogStore } from "../catalog/catalog-store";
 import { useFunnelTracking } from "../hooks/use-funnel-tracking";
 import { useStudioSession } from "../hooks/use-studio-session";
@@ -89,10 +91,14 @@ export function StudioWizard() {
   const setNote = useStudioStore((state) => state.setNote);
   const setFont = useStudioStore((state) => state.setFont);
   const setTextColor = useStudioStore((state) => state.setTextColor);
+  const addInspirationAssets = useStudioStore((state) => state.addInspirationAssets);
+  const removeInspirationAsset = useStudioStore((state) => state.removeInspirationAsset);
   const dismissStaleNotice = useStudioStore((state) => state.dismissStaleNotice);
   const goToStep = useStudioStore((state) => state.goToStep);
   const nextStep = useStudioStore((state) => state.nextStep);
   const prevStep = useStudioStore((state) => state.prevStep);
+  const [uploadingInspiration, setUploadingInspiration] = useState(false);
+  const [inspirationError, setInspirationError] = useState<string | null>(null);
 
   const currentStatus = index ? getStepStatus(currentStep, selections, index) : "incomplete";
   const incompleteStep = useMemo(
@@ -103,6 +109,28 @@ export function StudioWizard() {
   const selectedBaseItem = selections.baseItemId ? index?.baseItems.get(selections.baseItemId) : undefined;
   const availableMolds = catalog?.steps.molds.filter((mold) => mold.base_item_id === selections.baseItemId) ?? [];
   const canGoForward = currentStep < 6 && currentStatus === "complete";
+  const uploadInspiration = async (files: File[]) => {
+    setInspirationError(null);
+    if (files.length === 0) return;
+    if (files.length > 3 - selections.inspirationAssetIds.length) {
+      setInspirationError(`You can add up to ${3 - selections.inspirationAssetIds.length} more inspiration image(s).`);
+      return;
+    }
+    const invalidFile = files.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024);
+    if (invalidFile) {
+      setInspirationError("Choose JPEG, PNG, or WebP images no larger than 5 MB each.");
+      return;
+    }
+    setUploadingInspiration(true);
+    try {
+      const assets = await studioApi.uploadInspiration(files);
+      addInspirationAssets(assets.map((asset) => asset.id));
+    } catch (error) {
+      setInspirationError(errorMessage(error, "The inspiration images could not be uploaded."));
+    } finally {
+      setUploadingInspiration(false);
+    }
+  };
 
   if (session.loading) return <StudioSkeleton />;
 
@@ -375,6 +403,49 @@ export function StudioWizard() {
                 maxLength={300}
               />
             </label>
+            <section className="space-y-3" aria-labelledby="inspiration-heading">
+              <div>
+                <h3 id="inspiration-heading" className="text-lg">Inspiration images</h3>
+                <p className="text-sm text-muted-foreground">
+                  Optional · Up to 3 JPEG, PNG, or WebP images (5 MB each).
+                </p>
+              </div>
+              <label className="block space-y-2 text-sm font-medium" htmlFor="inspiration-upload">
+                <span>Add reference images</span>
+                <input
+                  id="inspiration-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  disabled={uploadingInspiration || selections.inspirationAssetIds.length >= 3}
+                  onChange={(event) => {
+                    void uploadInspiration(Array.from(event.currentTarget.files ?? []));
+                    event.currentTarget.value = "";
+                  }}
+                  className="block w-full rounded-md border border-input bg-background p-2"
+                />
+              </label>
+              {uploadingInspiration && <p role="status" className="text-sm">Uploading inspiration images…</p>}
+              {inspirationError && <p role="alert" className="text-sm text-destructive">{inspirationError}</p>}
+              {selections.inspirationAssetIds.length > 0 && (
+                <ul className="space-y-2">
+                  {selections.inspirationAssetIds.map((assetId) => (
+                    <li key={assetId} className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                      <span>Image {assetId.slice(0, 8)}</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => removeInspirationAsset(assetId)}
+                        aria-label={`Remove inspiration image ${assetId.slice(0, 8)}`}
+                      >
+                        Remove
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </section>
         );
       case 6:
