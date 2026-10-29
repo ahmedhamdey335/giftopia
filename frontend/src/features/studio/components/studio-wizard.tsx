@@ -9,7 +9,7 @@ import { useStudioSession } from "../hooks/use-studio-session";
 import { useStudioValidation } from "../hooks/use-studio-validation";
 import { STEPS } from "../steps";
 import { resolveMoodPreset } from "../store/mappers";
-import { firstIncompleteStep, getStepStatus } from "../store/selectors";
+import { firstIncompleteStep, getStepStatus, isOptionBlocked } from "../store/selectors";
 import { useStudioStore } from "../store/studio-store";
 
 function StudioSkeleton() {
@@ -36,15 +36,21 @@ function SelectionButton({
   selected,
   children,
   onClick,
+  disabled,
+  describedBy,
 }: {
   selected: boolean;
   children: React.ReactNode;
   onClick: () => void;
+  disabled?: boolean;
+  describedBy?: string;
 }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
+      aria-describedby={describedBy}
+      disabled={disabled}
       onClick={onClick}
       className={`min-h-16 rounded-xl border p-4 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         selected ? "border-primary bg-secondary" : "border-border bg-card hover:bg-muted"
@@ -203,11 +209,12 @@ export function StudioWizard() {
           </div>
         );
       }
-      case 3:
+      case 3: {
+        const technique = selections.techniqueId === null ? undefined : index.techniques.get(selections.techniqueId);
         return (
           <div className="space-y-6">
             <h2 className="text-2xl">Choose your pigments</h2>
-            {(["base", "accent"] as const).map((role) => {
+            {(["base", ...(technique?.requires_accent ? ["accent" as const] : [])] as const).map((role) => {
               const colors = catalog.steps.colors[role];
               const selectedId = role === "base" ? selections.baseColorId : selections.accentColorId;
               const setColor = role === "base" ? setBaseColor : setAccentColor;
@@ -215,28 +222,46 @@ export function StudioWizard() {
                 <section key={role} className="space-y-3">
                   <h3 className="text-xl">{role === "base" ? "Base color" : "Accent color"}</h3>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {colors.map((color) => (
-                      <SelectionButton
-                        key={color.id}
-                        selected={selectedId === color.id}
-                        onClick={() => setColor(color.id)}
-                      >
-                        <span className="flex items-center gap-3">
-                          <span
-                            aria-hidden="true"
-                            className="h-7 w-7 shrink-0 rounded-full border border-border"
-                            style={{ backgroundColor: color.hex }}
-                          />
-                          {color.name}
-                        </span>
-                      </SelectionButton>
-                    ))}
+                    {colors.map((color) => {
+                      const blockedMessage = isOptionBlocked(validation.result, "color_swatch", color.id);
+                      const unavailableMessage = color.is_available ? null : `${color.name} is currently unavailable.`;
+                      const helperMessage = blockedMessage ?? unavailableMessage;
+                      const helperId = `pigment-help-${role}-${color.id}`;
+                      return (
+                        <div key={color.id}>
+                          <SelectionButton
+                            selected={selectedId === color.id}
+                            disabled={helperMessage !== null}
+                            describedBy={helperMessage ? helperId : undefined}
+                            onClick={() => setColor(color.id)}
+                          >
+                            <span className="flex items-center gap-3">
+                              <span
+                                aria-hidden="true"
+                                className="h-7 w-7 shrink-0 rounded-full border border-border"
+                                style={{ backgroundColor: color.hex }}
+                              />
+                              <span>
+                                <span className="block font-medium">{color.name}</span>
+                                <span className="block text-sm text-muted-foreground">
+                                  {color.price_delta === 0 ? "No added cost" : `Price difference ${formatEgp(color.price_delta)}`}
+                                </span>
+                              </span>
+                            </span>
+                          </SelectionButton>
+                          {helperMessage && (
+                            <p id={helperId} className="mt-1 text-sm text-destructive">{helperMessage}</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
               );
             })}
           </div>
         );
+      }
       case 4:
         return (
           <section className="space-y-3">
