@@ -10,9 +10,10 @@ import { useFunnelTracking } from "../hooks/use-funnel-tracking";
 import { useStudioSession } from "../hooks/use-studio-session";
 import { useStudioValidation } from "../hooks/use-studio-validation";
 import { STEPS } from "../steps";
-import { resolveMoodPreset } from "../store/mappers";
+import { resolveMoodPreset, selectionsToRequest } from "../store/mappers";
 import { firstIncompleteStep, getStepStatus, isOptionBlocked } from "../store/selectors";
 import { useStudioStore } from "../store/studio-store";
+import { QuoteDialog } from "./quote-dialog";
 
 function StudioSkeleton() {
   return (
@@ -75,6 +76,8 @@ export function StudioWizard() {
   const index = useCatalogStore((state) => state.index);
   const selections = useStudioStore((state) => state.selections);
   const validation = useStudioStore((state) => state.validation);
+  const quote = useStudioStore((state) => state.quote);
+  const setQuote = useStudioStore((state) => state.setQuote);
   const currentStep = useStudioStore((state) => state.currentStep);
   const highestStep = useStudioStore((state) => state.highestStep);
   const savedAt = useStudioStore((state) => state.savedAt);
@@ -99,6 +102,8 @@ export function StudioWizard() {
   const prevStep = useStudioStore((state) => state.prevStep);
   const [uploadingInspiration, setUploadingInspiration] = useState(false);
   const [inspirationError, setInspirationError] = useState<string | null>(null);
+  const [requestingQuote, setRequestingQuote] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const currentStatus = index ? getStepStatus(currentStep, selections, index) : "incomplete";
   const incompleteStep = useMemo(
@@ -109,6 +114,7 @@ export function StudioWizard() {
   const selectedBaseItem = selections.baseItemId ? index?.baseItems.get(selections.baseItemId) : undefined;
   const availableMolds = catalog?.steps.molds.filter((mold) => mold.base_item_id === selections.baseItemId) ?? [];
   const canGoForward = currentStep < 6 && currentStatus === "complete";
+  const canRequestQuote = incompleteStep === null && validation.status === "ready" && validation.result?.allowed === true;
   const uploadInspiration = async (files: File[]) => {
     setInspirationError(null);
     if (files.length === 0) return;
@@ -129,6 +135,18 @@ export function StudioWizard() {
       setInspirationError(errorMessage(error, "The inspiration images could not be uploaded."));
     } finally {
       setUploadingInspiration(false);
+    }
+  };
+  const requestQuote = async () => {
+    if (!index || !canRequestQuote) return;
+    setQuoteError(null);
+    setRequestingQuote(true);
+    try {
+      setQuote(await studioApi.quote(selectionsToRequest(selections, index)));
+    } catch (error) {
+      setQuoteError(errorMessage(error, "We could not create your quote. Please review your design and try again."));
+    } finally {
+      setRequestingQuote(false);
     }
   };
 
@@ -470,6 +488,12 @@ export function StudioWizard() {
                 ))}
               </ul>
             )}
+            {validation.result?.violations.map((violation, position) => (
+              <p key={`${violation.rule}-${position}`} className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                {violation.message}
+              </p>
+            ))}
+            {quoteError && <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{quoteError}</p>}
           </section>
         );
     }
@@ -501,8 +525,14 @@ export function StudioWizard() {
   );
 
   const nextButton = (
-    <Button className="min-h-11" onClick={nextStep} disabled={!canGoForward}>
-      {currentStep === 5 ? "Review design" : "Next"}
+    <Button
+      className="min-h-11"
+      onClick={currentStep === 6 ? () => void requestQuote() : nextStep}
+      disabled={currentStep === 6 ? !canRequestQuote || requestingQuote : !canGoForward}
+    >
+      {currentStep === 6
+        ? requestingQuote ? "Creating quote…" : "Request quote"
+        : currentStep === 5 ? "Review design" : "Next"}
     </Button>
   );
   const backButton = (
@@ -592,6 +622,7 @@ export function StudioWizard() {
           </div>
         </div>
       </div>
+      {quote && <QuoteDialog quote={quote} onClose={() => setQuote(null)} />}
     </div>
   );
 }
