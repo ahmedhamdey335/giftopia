@@ -10,7 +10,7 @@ export function getStepStatus(step: StepId, s: StudioSelections, index: CatalogI
     case 1: {
       if (s.baseItemId === null || s.moldId === null) return "incomplete";
       const mold = index?.molds.get(s.moldId);
-      return mold && mold.base_item_id !== s.baseItemId ? "incomplete" : "complete";
+      return mold?.base_item_id === s.baseItemId ? "complete" : "incomplete";
     }
     case 2:
       return s.moodId !== null && s.techniqueId !== null ? "complete" : "incomplete";
