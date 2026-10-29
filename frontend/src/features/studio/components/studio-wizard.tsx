@@ -87,6 +87,8 @@ export function StudioWizard() {
   const toggleInsert = useStudioStore((state) => state.toggleInsert);
   const setText = useStudioStore((state) => state.setText);
   const setNote = useStudioStore((state) => state.setNote);
+  const setFont = useStudioStore((state) => state.setFont);
+  const setTextColor = useStudioStore((state) => state.setTextColor);
   const dismissStaleNotice = useStudioStore((state) => state.dismissStaleNotice);
   const goToStep = useStudioStore((state) => state.goToStep);
   const nextStep = useStudioStore((state) => state.nextStep);
@@ -302,6 +304,9 @@ export function StudioWizard() {
             <h2 className="text-2xl">Personalize your piece</h2>
             <label className="block space-y-2 text-sm font-medium" htmlFor="personalization-text">
               <span>Personalization text</span>
+              <span className="block font-normal text-muted-foreground">
+                Optional · {selections.text.length}/{selectedBaseItem?.max_text_chars ?? 120} characters
+              </span>
               <textarea
                 id="personalization-text"
                 value={selections.text}
@@ -310,8 +315,58 @@ export function StudioWizard() {
                 maxLength={selectedBaseItem?.max_text_chars ?? 120}
               />
             </label>
+            <section className="space-y-2" aria-labelledby="font-heading">
+              <h3 id="font-heading" className="text-lg">Choose a font</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {catalog.steps.personalization.fonts.map((font) => {
+                  const blockedMessage = isOptionBlocked(validation.result, "font", font.id);
+                  const helperId = `font-help-${font.id}`;
+                  return (
+                    <div key={font.id}>
+                      <SelectionButton
+                        selected={selections.fontId === font.id}
+                        disabled={blockedMessage !== null && selections.fontId !== font.id}
+                        describedBy={blockedMessage ? helperId : undefined}
+                        onClick={() => setFont(selections.fontId === font.id ? null : font.id)}
+                      >
+                        <span className="block font-medium">{font.name}</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          Price difference {formatEgp(font.price_delta)}
+                        </span>
+                      </SelectionButton>
+                      {blockedMessage && <p id={helperId} className="mt-1 text-sm text-destructive">{blockedMessage}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+            <section className="space-y-2" aria-labelledby="text-color-heading">
+              <h3 id="text-color-heading" className="text-lg">Choose a text color</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {catalog.steps.personalization.text_colors.map((color) => {
+                  const blockedMessage = isOptionBlocked(validation.result, "text_color", color.id);
+                  const helperId = `text-color-help-${color.id}`;
+                  return (
+                    <div key={color.id}>
+                      <SelectionButton
+                        selected={selections.textColorId === color.id}
+                        disabled={blockedMessage !== null && selections.textColorId !== color.id}
+                        describedBy={blockedMessage ? helperId : undefined}
+                        onClick={() => setTextColor(selections.textColorId === color.id ? null : color.id)}
+                      >
+                        <span className="block font-medium">{color.name}</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          Price difference {formatEgp(color.price_delta)}
+                        </span>
+                      </SelectionButton>
+                      {blockedMessage && <p id={helperId} className="mt-1 text-sm text-destructive">{blockedMessage}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
             <label className="block space-y-2 text-sm font-medium" htmlFor="personalization-note">
-              <span>Note for the maker</span>
+              <span>Note for the maker · Optional ({selections.note.length}/300 characters)</span>
               <textarea
                 id="personalization-note"
                 value={selections.note}
