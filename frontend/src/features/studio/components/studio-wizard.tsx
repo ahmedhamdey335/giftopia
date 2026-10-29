@@ -231,9 +231,9 @@ export function StudioWizard() {
                         <div key={color.id}>
                           <SelectionButton
                             selected={selectedId === color.id}
-                            disabled={helperMessage !== null}
+                            disabled={helperMessage !== null && selectedId !== color.id}
                             describedBy={helperMessage ? helperId : undefined}
-                            onClick={() => setColor(color.id)}
+                            onClick={() => setColor(selectedId === color.id ? null : color.id)}
                           >
                             <span className="flex items-center gap-3">
                               <span
