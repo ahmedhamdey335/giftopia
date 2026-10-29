@@ -142,7 +142,10 @@ export function StudioWizard() {
                       selected={selections.moldId === mold.id}
                       onClick={() => setMold(mold.id)}
                     >
-                      {mold.name}
+                      <span className="block font-medium">{mold.name}</span>
+                      <span className="mt-1 block text-sm text-muted-foreground">
+                        {mold.size_label ?? "Standard size"} · Price difference {formatEgp(mold.price_delta)}
+                      </span>
                     </SelectionButton>
                   ))}
                 </div>
