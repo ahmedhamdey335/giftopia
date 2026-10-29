@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatEgp } from "@/lib/money";
 import type { QuoteSummary } from "../types";
@@ -80,7 +81,12 @@ export function QuoteDialog({ quote, onClose }: { quote: QuoteSummary; onClose: 
             : `Quote expires in ${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}`}
         </p>
         <div className="mt-6 flex justify-end">
-          <Button ref={closeRef} type="button" onClick={onClose}>Close quote</Button>
+          <Button ref={closeRef} type="button" variant="outline" onClick={onClose}>Close quote</Button>
+          {secondsLeft > 0 && (
+            <Button asChild className="ms-2">
+              <Link href="/checkout">Continue to checkout</Link>
+            </Button>
+          )}
         </div>
       </div>
     </div>
