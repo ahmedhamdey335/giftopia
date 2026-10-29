@@ -33,8 +33,7 @@ export interface ApiResult<T> {
 }
 
 function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const base = API_URL + (path.startsWith("/") ? path : "/" + path);
-  const url = new URL(base);
+  const url = new URL(`${API_URL}${path.startsWith("/") ? path : `/${path}`}`);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== null && value !== undefined) url.searchParams.set(key, String(value));
   }
@@ -94,7 +93,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       headers,
       body: payload,
       signal: withTimeout(signal, timeoutMs),
-      // The API is cross-origin and does not accept cookies, so this is always omitted.
+      // Bearer tokens only; never send cookies cross-origin (the API's CORS has credentials off).
       credentials: "omit",
       keepalive,
       // Private/authenticated and mutating calls are never cached. Public GETs revalidate, so the

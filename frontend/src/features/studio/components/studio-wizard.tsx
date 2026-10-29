@@ -5,7 +5,6 @@ import { useCatalogStore } from "../catalog/catalog-store";
 import { useFunnelTracking } from "../hooks/use-funnel-tracking";
 import { useStudioSession } from "../hooks/use-studio-session";
 import { useStudioValidation } from "../hooks/use-studio-validation";
-import { getStepStatus } from "../store/selectors";
 import { useStudioStore } from "../store/studio-store";
 import { selectionsToRequest } from "../store/mappers";
 import { STEPS } from "../steps";
@@ -281,7 +280,6 @@ export function StudioWizard() {
       <header className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           {STEPS.map((step) => {
-            const status = getStepStatus(step.id as 1 | 2 | 3 | 4 | 5 | 6, selections, index);
             const active = currentStep === step.id;
             const reachable = step.id <= highestStep;
             return (
