@@ -8,8 +8,15 @@ use App\Models\OptionRule;
 use App\Services\Studio\CompatibilityResult;
 use App\Services\Studio\StudioConfiguration;
 
+/** Applies required, blocked, and built-in business rules to a resolved Studio design. */
 class CompatibilityValidator
 {
+    /**
+     * Check whether options can be made together.
+     *
+     * Non-strict checks can return warnings while the customer is still choosing; strict checks
+     * turn missing required choices into violations and are used before saving a quote.
+     */
     public function validate(StudioConfiguration $config, bool $strict = false): CompatibilityResult
     {
         $violations = [];

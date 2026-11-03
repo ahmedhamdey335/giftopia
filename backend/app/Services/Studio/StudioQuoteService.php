@@ -5,6 +5,7 @@ namespace App\Services\Studio;
 use App\Models\Quote;
 use App\Models\User;
 
+/** Persist normalized, server-priced designs as expiring offers that checkout can verify. */
 final class StudioQuoteService
 {
     public function __construct(
@@ -12,6 +13,7 @@ final class StudioQuoteService
         private readonly LeadTimeEstimator $leadTime,
     ) {}
 
+    /** Store the design hash, price snapshot, indicative date, expiration, and optional owner. */
     public function create(StudioConfiguration $configuration, ?User $user): Quote
     {
         $normalized = $configuration->normalizedConfiguration();
@@ -31,6 +33,8 @@ final class StudioQuoteService
     }
 
     /**
+     * Shape a saved quote for the public API without exposing persistence details.
+     *
      * @return array<string, mixed>
      */
     public function response(Quote $quote): array

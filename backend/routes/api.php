@@ -15,9 +15,11 @@ use App\Http\Controllers\StudioEventController;
 use App\Support\CatalogRegistry;
 use Illuminate\Support\Facades\Route;
 
+// Public account entry points. Registration always assigns the customer role.
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
+// Catalog browsing, draft checks, quotes, and inspiration uploads support guests where appropriate.
 Route::prefix('studio')->name('studio.')->middleware('throttle:30,1')->group(function () {
     Route::get('/catalog', [StudioController::class, 'catalog'])->name('catalog');
     Route::post('/validate', [StudioController::class, 'validateConfiguration'])->name('validate');
@@ -40,6 +42,7 @@ Route::post('/payments/webhook/{provider}', [PaymentController::class, 'webhook'
     ->middleware('throttle:60,1')
     ->name('payments.webhook');
 
+// Customer and staff operations require a token; nested role and policy checks limit access further.
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);

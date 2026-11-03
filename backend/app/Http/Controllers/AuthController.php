@@ -10,8 +10,10 @@ use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 
+/** Create customer accounts and issue or revoke Sanctum API tokens. */
 class AuthController extends Controller
 {
+    /** Register a customer; account roles are assigned by the server, not by the request. */
     public function register(RegisterRequest $request): JsonResponse
     {
         $user = User::query()->create([
@@ -22,6 +24,7 @@ class AuthController extends Controller
         return $this->tokenResponse($user, 201);
     }
 
+    /** Verify credentials and issue a bearer token for later authenticated requests. */
     public function login(LoginRequest $request): JsonResponse
     {
         $user = User::query()->where('email', $request->validated('email'))->first();
@@ -32,6 +35,7 @@ class AuthController extends Controller
         return $this->tokenResponse($user);
     }
 
+    /** Revoke the token used for the current authenticated request. */
     public function logout(): JsonResponse
     {
         request()->user()->currentAccessToken()?->delete();
@@ -39,6 +43,7 @@ class AuthController extends Controller
         return ApiResponse::success(null, 'Logged out.');
     }
 
+    /** Return the identity and role associated with the current token. */
     public function me(): JsonResponse
     {
         $user = request()->user();

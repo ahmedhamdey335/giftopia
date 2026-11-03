@@ -22,8 +22,15 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Public API entry points for the customer design flow: catalog, live checks, and quotes.
+ *
+ * Business rules and price calculations live in services so validation and quote creation
+ * use the same domain behavior.
+ */
 class StudioController extends Controller
 {
+    /** Return the active design choices and settings, with an ETag for catalog revalidation. */
     public function catalog(Request $request, CatalogVersionService $versions): Response
     {
         $baseItems = BaseItem::query()->active()->orderBy('name')->get();
@@ -67,6 +74,7 @@ class StudioController extends Controller
         ])->header('ETag', $etag);
     }
 
+    /** Return live compatibility guidance and partial pricing without saving a quote. */
     public function validateConfiguration(
         StudioConfigurationRequest $request,
         CompatibilityValidator $validator,
@@ -80,6 +88,7 @@ class StudioController extends Controller
         return ApiResponse::success($data, $result->allowed ? 'Configuration is valid.' : 'Configuration has issues.');
     }
 
+    /** Create a time-limited quote only after the complete design passes strict compatibility checks. */
     public function quote(
         StudioConfigurationRequest $request,
         CompatibilityValidator $validator,

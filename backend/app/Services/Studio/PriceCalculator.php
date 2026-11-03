@@ -5,6 +5,10 @@ namespace App\Services\Studio;
 final class PriceCalculator
 {
     /**
+     * Calculate current catalog prices in integer piasters.
+     *
+     * Delivery is excluded here because it is added later during checkout.
+     *
      * @return array{items: list<array{key: string, id: int, name: string, amount: int}>, total: int, currency: string}
      */
     public function calculate(StudioConfiguration $config): array

@@ -13,8 +13,10 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\Response;
 
+/** Upload customer inspiration and serve files only through short-lived signed links. */
 class AssetController extends Controller
 {
+    /** Store up to the request's allowed number of inspiration files and return their IDs and URLs. */
     public function store(AssetUploadRequest $request, AssetUploadService $uploads): JsonResponse
     {
         $assets = $uploads->uploadInspiration($request->file('files'), $request->user());
@@ -34,6 +36,7 @@ class AssetController extends Controller
         ], 'Inspiration assets uploaded.', 201);
     }
 
+    /** Enforce ownership and asset-purpose rules before returning a stored file. */
     public function file(Request $request, Asset $asset): Response
     {
         $user = $request->user();

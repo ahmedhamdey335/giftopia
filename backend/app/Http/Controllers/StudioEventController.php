@@ -7,8 +7,10 @@ use App\Models\StudioEvent;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
+/** Accept small anonymous Studio funnel batches; events are for aggregate product analytics. */
 class StudioEventController extends Controller
 {
+    /** Validate and insert the submitted events in one database operation. */
     public function store(StudioEventBatchRequest $request): JsonResponse
     {
         $events = collect($request->validated('events'))->map(fn (array $event): array => [

@@ -12,6 +12,12 @@ use App\Models\Technique;
 use App\Models\TextColor;
 use Illuminate\Support\Collection;
 
+/**
+ * A design after catalog IDs have been resolved into domain records.
+ *
+ * Keeps normalization, selected-option discovery, and shared design facts in one place for
+ * validation, pricing, quoting, and order snapshots.
+ */
 final class StudioConfiguration
 {
     /**
@@ -36,6 +42,11 @@ final class StudioConfiguration
     ) {}
 
     /**
+     * Resolve submitted option IDs and normalize optional text and asset IDs.
+     *
+     * Missing or unknown catalog IDs are recorded for the compatibility validator instead of
+     * silently disappearing from the customer's design.
+     *
      * @param  array<string, mixed>  $input
      */
     public static function fromArray(array $input): self
