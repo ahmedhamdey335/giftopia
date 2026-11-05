@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${display.variable} ${sans.variable} h-full`}>
       <body className="flex min-h-full flex-col">
         <Providers>
-          <SiteHeader />
+          <Suspense fallback={<div className="h-16 border-b border-border/70 bg-background/90" />}>
+            <SiteHeader />
+          </Suspense>
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </Providers>
@@ -41,3 +44,4 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     </html>
   );
 }
+

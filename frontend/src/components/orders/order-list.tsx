@@ -5,9 +5,11 @@ import { ChevronRight, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOrders } from "@/features/orders/use-orders";
 import { formatDate, statusTone } from "@/features/orders/status";
+import { type Order, type OrderItem } from "@/features/orders/orders-api";
 import { errorMessage } from "@/lib/api/errors";
 import { formatEgp } from "@/lib/money";
 import { StatusBadge } from "./status-badge";
+
 
 export function OrderList() {
   const { data, error, isLoading, mutate } = useOrders();
@@ -54,7 +56,7 @@ export function OrderList() {
 
   return (
     <ul className="flex flex-col gap-3">
-      {orders.map((order) => {
+      {orders.map((order: Order) => {
         const needsAction = statusTone(order.status) === "action";
         return (
           <li key={order.id}>
@@ -68,8 +70,9 @@ export function OrderList() {
                   <StatusBadge order={order} />
                 </div>
                 <p className="truncate text-sm text-muted-foreground">
-                  {order.items.map((item) => item.name).join(", ")}
+                  {order.items.map((item: OrderItem) => item.name).join(", ")}
                 </p>
+
                 <p className="text-xs text-muted-foreground">
                   Placed {formatDate(order.created_at)} · Ready by {formatDate(order.ready_by)}
                 </p>

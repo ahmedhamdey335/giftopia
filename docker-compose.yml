@@ -125,3 +125,4 @@ services:
       - nginx
     networks:
       - giftopia
+    restart: unless-stopped

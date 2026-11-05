@@ -1,11 +1,10 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { Suspense, useEffect, type ReactNode } from "react";
 import { useAuth } from "./auth-provider";
 
-/** Wrap pages that need a signed-in customer (checkout, orders). Redirects guests to /login?next=. */
-export function RequireAuth({ children, fallback = null }: { children: ReactNode; fallback?: ReactNode }) {
+function RequireAuthContent({ children, fallback = null }: { children: ReactNode; fallback?: ReactNode }) {
   const { status } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -18,4 +17,13 @@ export function RequireAuth({ children, fallback = null }: { children: ReactNode
 
   if (status !== "authenticated") return <>{fallback}</>;
   return <>{children}</>;
+}
+
+/** Wrap pages that need a signed-in customer (checkout, orders). Redirects guests to /login?next=. */
+export function RequireAuth({ children, fallback = null }: { children: ReactNode; fallback?: ReactNode }) {
+  return (
+    <Suspense fallback={fallback}>
+      <RequireAuthContent fallback={fallback}>{children}</RequireAuthContent>
+    </Suspense>
+  );
 }
